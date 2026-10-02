@@ -20,6 +20,13 @@ from videodl.errors import classify_error
         ("ERROR: unable to download video data: HTTP Error 403: Forbidden", "extractor"),
         ("ERROR: [youtube] abc: Private video. Sign in if you've been granted access to this video", "private"),
         ("ERROR: [Instagram] xyz: Requested content is not available, rate-limit reached or login required", "private"),
+        ("ERROR: [Instagram] CWqAgUZgCku: Instagram sent an empty media response. Check if this post is accessible "
+         "in your browser without being logged-in. If it is not, then use --cookies-from-browser or --cookies for the "
+         "authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to "
+         "manually pass cookies. Otherwise, if the post is accessible in browser without being logged-in, please report "
+         "this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template.", "private"),
+        ("ERROR: [TikTok] 6748451240264420610: Your IP address is blocked from accessing this post", "unavailable"),
+        ("ERROR: [generic] x: something odd; please report this issue on https://github.com/yt-dlp/yt-dlp/issues", "extractor"),
         ("algo totalmente diferente", "unknown"),
     ],
 )

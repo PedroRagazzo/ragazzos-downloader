@@ -20,7 +20,7 @@ _RULES = (
      "Não consegui salvar o arquivo", False),
     ("unavailable", ("video unavailable", "this video is unavailable", "has been removed", "no longer available",
                      "not available in your country", "geo restriction", "geo-restricted", "http error 404",
-                     "http error 410", "video has been deleted"),
+                     "http error 410", "video has been deleted", "ip address is blocked"),
      "Vídeo indisponível", False),
     ("unsupported", ("unsupported url", "no video formats found", "no video could be found", "not a valid url",
                      "there is no video in this post"),
@@ -29,12 +29,15 @@ _RULES = (
                  "getaddrinfo failed", "name resolution", "network is unreachable", "remote end closed",
                  "urlopen error", "incompleteread", "winerror 10054", "winerror 10060"),
      "Falha de conexão, tentando de novo…", True),
-    ("extractor", ("not a bot", "unable to extract", "please report this issue", "signature", "nsig",
+    ("extractor", ("not a bot", "unable to extract", "signature", "nsig",
                    "unable to download api page", "unable to download webpage", "jsinterp", "http error 403"),
      "O site mudou — clique em Atualizar", False),
     ("private", ("private", "login required", "log in", "login", "sign in", "requires authentication",
                  "--cookies", "age-restricted", "confirm your age"),
      "Conteúdo privado — por enquanto só baixo vídeos públicos", False),
+    # o yt-dlp põe "please report this issue" no fim de vários erros; só vale se nada acima explicou
+    ("extractor", ("please report this issue",),
+     "O site mudou — clique em Atualizar", False),
 )
 
 _UNKNOWN = ErrorInfo("unknown", "Erro inesperado — veja os detalhes", False)
