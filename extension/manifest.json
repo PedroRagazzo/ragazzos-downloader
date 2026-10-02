@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Vídeo Downloader",
+  "version": "0.1.0",
+  "description": "Baixe vídeos e áudios do YouTube, TikTok, Instagram e Pinterest.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Vídeo Downloader"
+  },
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:47321/*"
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqAxz8nCVi59PfQCHm/19l/9FaFveH5LOy4J5Wjc1M9T0S0gNaL0MSafVZFnHuQKpG3AxKY7NwjZIh8ynWZ3i1197SppJJtF9GYRd6lF5X6uAd4g62w1QH882hZxUeMooyhp7nHR0xHh4a04NQ8/bvZ+Y1xmXpiZgZweL5650hfz7Khfixs8ZBbV0Dh2CT8OA6Nq3dH49kbff9TnrX74TKByLPSChuzuVcbToRwsHEMPgs5bUerYTaHcY4FouDdUXqRWd6+u7wbPe/DLmpooBlKgvnF6+pKa9SXKnN6zrrQPG9ABbgDay6LxGC968RcjJkE0DTmvbjryZPQ2C30EJnQIDAQAB"
+}
