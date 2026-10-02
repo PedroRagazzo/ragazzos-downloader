@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 
 MAX_BODY = 1_000_000
 MAX_URLS = 200
+MARKER_HEADER = "X-Video-Downloader"
 _ITEM_ACTION = re.compile(r"/queue/([\w-]+)/(cancel|retry)")
 
 
@@ -70,6 +71,19 @@ class ApiHandler(BaseHTTPRequestHandler):
     def _origin_ok(self) -> bool:
         return self.headers.get("Origin") == self.server.allowed_origin
 
+    def _request_ok(self) -> bool:
+        # A extensão sempre manda MARKER_HEADER. Um site não consegue mandar cabeçalho próprio sem
+        # preflight, e o preflight exige a origem da extensão. O Origin pode faltar: o Brave não o
+        # envia nos GET de extensão com host_permissions; quando vier, tem de ser o da extensão.
+        origin = self.headers.get("Origin")
+        return self.headers.get(MARKER_HEADER) == "1" and origin in (None, self.server.allowed_origin)
+
+    def _reject_origin(self) -> None:
+        log.warning("pedido recusado: Origin=%r %s=%r em %s %s (esperada %s)",
+                    self.headers.get("Origin"), MARKER_HEADER, self.headers.get(MARKER_HEADER),
+                    self.command, self.path, self.server.allowed_origin)
+        self._send(403, {"error": "origem não permitida"})
+
     def _cors_headers(self) -> None:
         if self._origin_ok():
             self.send_header("Access-Control-Allow-Origin", self.server.allowed_origin)
@@ -86,12 +100,12 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self) -> None:
         if not self._origin_ok():
-            self._send(403, {"error": "origem não permitida"})
+            self._reject_origin()
             return
         self.send_response(204)
         self._cors_headers()
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", f"Content-Type, {MARKER_HEADER}")
         self.send_header("Access-Control-Max-Age", "600")
         self.send_header("Content-Length", "0")
         self.end_headers()
@@ -103,8 +117,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         self._dispatch("POST")
 
     def _dispatch(self, method: str) -> None:
-        if not self._origin_ok():
-            self._send(403, {"error": "origem não permitida"})
+        if not self._request_ok():
+            self._reject_origin()
             return
         parts = urlsplit(self.path)
         try:

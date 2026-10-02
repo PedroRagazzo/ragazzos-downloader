@@ -44,11 +44,13 @@ def api(tmp_path):
     base = f"http://127.0.0.1:{server.server_address[1]}"
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-    def call(method, path, body=None, origin=ORIGIN, raw=None):
+    def call(method, path, body=None, origin=ORIGIN, raw=None, marker=True):
         data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
         req = urllib.request.Request(base + path, data=data, method=method)
         if origin:
             req.add_header("Origin", origin)
+        if marker and method != "OPTIONS":
+            req.add_header("X-Video-Downloader", "1")
         if data is not None:
             req.add_header("Content-Type", "application/json")
         try:
@@ -64,12 +66,34 @@ def api(tmp_path):
     server.server_close()
 
 
-def test_rejects_missing_or_foreign_origin(api):
-    assert api.call("GET", "/status", origin=None)[0] == 403
+def test_rejects_foreign_origin_even_with_marker(api):
     assert api.call("GET", "/status", origin="https://evil.example")[0] == 403
     assert api.call("POST", "/queue", {"urls": ["https://youtu.be/a"], "mode": "video", "quality": "best"},
                     origin="https://evil.example")[0] == 403
     assert api.queue.list() == []
+
+
+def test_rejects_requests_without_extension_marker(api):
+    # um site não consegue mandar cabeçalho próprio sem preflight, e o preflight exige a origem da extensão
+    assert api.call("GET", "/status", origin=None, marker=False)[0] == 403
+    assert api.call("GET", "/status", marker=False)[0] == 403
+    assert api.call("POST", "/queue", {"urls": ["https://youtu.be/a"], "mode": "video", "quality": "best"},
+                    origin=None, marker=False)[0] == 403
+    assert api.queue.list() == []
+
+
+def test_accepts_extension_get_without_origin(api):
+    # o Brave não manda Origin nos GET de extensão com host_permissions
+    status, body, _ = api.call("GET", "/status", origin=None)
+    assert status == 200 and body["ok"] is True
+
+
+def test_rejected_origin_is_logged(api, caplog):
+    with caplog.at_level("WARNING", logger="videodl.server"):
+        api.call("GET", "/status", origin="chrome-extension://outroid")
+        api.call("OPTIONS", "/queue", origin=None)
+    assert "chrome-extension://outroid" in caplog.text
+    assert "OPTIONS /queue" in caplog.text
 
 
 def test_preflight(api):
@@ -77,6 +101,7 @@ def test_preflight(api):
     assert status == 204
     assert headers["Access-Control-Allow-Origin"] == ORIGIN
     assert "POST" in headers["Access-Control-Allow-Methods"]
+    assert "X-Video-Downloader" in headers["Access-Control-Allow-Headers"]
     assert api.call("OPTIONS", "/queue", origin="https://evil.example")[0] == 403
 
 

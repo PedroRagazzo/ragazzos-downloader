@@ -80,7 +80,7 @@ O popup consulta `GET /queue` a cada 1 s enquanto está aberto.
 
 ### Servidor
 - Escuta **somente** em `127.0.0.1:47321`.
-- **Validação de origem:** toda requisição precisa ter `Origin: chrome-extension://<ID fixo>`; caso contrário → `403`. CORS responde apenas para essa origem. Isso impede que páginas web abertas usem o helper.
+- **Validação de origem:** toda requisição precisa do cabeçalho `X-Video-Downloader: 1` e, se vier `Origin`, ele tem de ser `chrome-extension://<ID fixo>`; caso contrário → `403`. O preflight (OPTIONS) exige essa origem e CORS responde apenas para ela. Uma página web não consegue mandar o cabeçalho próprio sem preflight, então fica bloqueada. (O `Origin` pode faltar porque o Brave não o envia nos GET de extensão com `host_permissions`.)
 
 ### API
 

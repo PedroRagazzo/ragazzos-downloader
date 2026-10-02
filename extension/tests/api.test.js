@@ -23,6 +23,14 @@ test("addToQueue envia JSON por POST", async () => {
   assert.deepEqual(JSON.parse(calls[0].init.body), { urls: ["https://youtu.be/x"], mode: "audio", quality: "192" });
 });
 
+test("todo pedido leva o cabeçalho que identifica a extensão", async () => {
+  const calls = mockFetch(() => json(200, { ok: true }));
+  await api.status();
+  await api.addToQueue(["https://youtu.be/x"], "video", "best");
+  for (const call of calls) assert.equal(call.init.headers["X-Video-Downloader"], "1");
+  assert.equal(calls[1].init.headers["Content-Type"], "application/json");
+});
+
 test("info codifica a URL", async () => {
   const calls = mockFetch(() => json(200, { title: "t" }));
   await api.info("https://youtu.be/x?a=1&b=2");

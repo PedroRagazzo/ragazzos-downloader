@@ -17,7 +17,8 @@ async function request(method, path, body) {
   try {
     response = await fetch(BASE + path, {
       method,
-      headers: body ? { "Content-Type": "application/json" } : {},
+      // o programa só aceita pedidos com este cabeçalho (o Brave nem sempre manda Origin)
+      headers: { "X-Video-Downloader": "1", ...(body ? { "Content-Type": "application/json" } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
