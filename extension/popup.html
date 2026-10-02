@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Vídeo Downloader</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Vídeo Downloader</h1>
+    <span id="conn" class="conn"><span class="dot"></span><span id="conn-text">Conectando…</span></span>
+  </header>
+
+  <div id="offline" class="banner banner-error" hidden>
+    O programa não está rodando. Abra <b>Video Downloader</b> pelo menu Iniciar.
+  </div>
+  <div id="ffmpeg-warn" class="banner banner-warn" hidden>
+    ffmpeg não encontrado — rode <code>scripts\install.ps1</code>.
+  </div>
+
+  <section class="options">
+    <div class="segmented" role="radiogroup" aria-label="Formato">
+      <button type="button" data-mode="video" role="radio">🎬 Vídeo</button>
+      <button type="button" data-mode="audio" role="radio">🎵 Áudio</button>
+    </div>
+    <select id="quality" aria-label="Qualidade"></select>
+  </section>
+
+  <section id="page" class="card page" hidden>
+    <img id="page-thumb" alt="" hidden>
+    <div class="page-info">
+      <div class="label">Esta página</div>
+      <div id="page-title" class="page-title"></div>
+      <div id="page-msg" class="msg"></div>
+    </div>
+    <button type="button" id="page-add" class="primary">Adicionar</button>
+  </section>
+
+  <section class="card">
+    <label for="links" class="label">Colar links (um por linha)</label>
+    <textarea id="links" rows="3" placeholder="https://..."></textarea>
+    <div class="row">
+      <span id="links-msg" class="msg"></span>
+      <button type="button" id="links-add" class="primary">Adicionar à fila</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="queue-head">
+      <h2>Fila</h2>
+      <button type="button" id="open-folder" class="link">Abrir pasta</button>
+    </div>
+    <div id="update-box" class="banner banner-warn" hidden>
+      Algum site mudou. <button type="button" id="update-btn" class="link">Atualizar yt-dlp</button>
+      <span id="update-msg"></span>
+    </div>
+    <ul id="queue" class="queue"></ul>
+    <p id="queue-empty" class="empty">Nada na fila ainda.</p>
+  </section>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
