@@ -51,7 +51,7 @@ Get-CimInstance Win32_Process -Filter "Name='pythonw.exe'" |
     Where-Object { $_.CommandLine -like "*-m videodl*" } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 1
-Start-Process $pythonw -ArgumentList "-m", "videodl" -WorkingDirectory $helper
+Start-Process $pythonw -ArgumentList "-m", "videodl", "--wait-for-port" -WorkingDirectory $helper
 
 Write-Host ""
 Write-Host "Pronto! Agora carregue a extensão:" -ForegroundColor Green
