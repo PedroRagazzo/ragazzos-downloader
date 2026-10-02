@@ -141,6 +141,34 @@ def test_js_runtime_option(tmp_path):
     assert "js_runtimes" not in calls[1]
 
 
+def test_reports_reserved_base_name(tmp_path):
+    factory, _ = make_factory(INFO)
+    reports = []
+    YtDlpDownloader(tmp_path, ydl_factory=factory)(make_item(), reports.append, lambda: False)
+    assert {"base": "Meu vídeo [youtube]"} in reports
+
+
+def test_resumes_interrupted_download_with_same_name(tmp_path):
+    # PC desligou no meio: sobrou o .part e o item voltou para a fila lembrando o nome
+    (tmp_path / "Meu vídeo [youtube].f1.mp4.part").write_bytes(b"meio baixado")
+    factory, _ = make_factory(INFO)
+    item = make_item()
+    item.base = "Meu vídeo [youtube]"
+    path = YtDlpDownloader(tmp_path, ydl_factory=factory)(item, lambda u: None, lambda: False)
+    assert Path(path).name == "Meu vídeo [youtube].mp4"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["Meu vídeo [youtube].mp4"]
+
+
+def test_saved_base_is_not_reused_when_final_file_exists(tmp_path):
+    (tmp_path / "Meu vídeo [youtube].mp4").write_bytes(b"old")
+    factory, _ = make_factory(INFO)
+    item = make_item()
+    item.base = "Meu vídeo [youtube]"
+    path = YtDlpDownloader(tmp_path, ydl_factory=factory)(item, lambda u: None, lambda: False)
+    assert Path(path).name == "Meu vídeo [youtube] (2).mp4"
+    assert (tmp_path / "Meu vídeo [youtube].mp4").read_bytes() == b"old"
+
+
 def test_get_info(tmp_path):
     factory, _ = make_factory(INFO)
     info = YtDlpDownloader(tmp_path, ydl_factory=factory).get_info("https://youtu.be/a")

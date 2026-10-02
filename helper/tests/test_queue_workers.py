@@ -157,6 +157,32 @@ def test_pause_stops_picking_new_items(tmp_path):
         q.stop()
 
 
+def test_resumed_item_keeps_reported_base_name(tmp_path):
+    started = threading.Event()
+
+    def interrupted(item, report, is_cancelled):
+        report({"base": "Meu vídeo [youtube]"})
+        started.set()
+        while not is_cancelled():
+            time.sleep(0.01)
+        raise Cancelled()
+
+    q = DownloadQueue(tmp_path / "queue.json", interrupted)
+    q.start()
+    [item_id], _ = q.add(["https://youtu.be/a"], "video", "best")
+    assert started.wait(3)
+    q.stop()
+
+    seen = []
+    reopened = DownloadQueue(tmp_path / "queue.json", lambda item, report, is_cancelled: seen.append(item.base) or "x.mp4")
+    reopened.start()
+    try:
+        wait_for(lambda: item_of(reopened, item_id)["status"] == "done")
+        assert seen == ["Meu vídeo [youtube]"]
+    finally:
+        reopened.stop()
+
+
 def test_stop_leaves_running_item_to_resume(tmp_path):
     started = threading.Event()
 

@@ -88,8 +88,13 @@ class YtDlpDownloader:
             raise Cancelled()
         report({"title": info.get("title") or item.url})
 
-        base = self._reserve(build_base_name(info.get("title"), _site_of(info)))
-        target = self._dir / f"{base}.{final_extension(item.mode)}"
+        ext = final_extension(item.mode)
+        if item.base and not (self._dir / f"{item.base}.{ext}").exists():
+            base = self._reserve_saved(item.base)  # retomada: mesmo nome, o yt-dlp continua o .part
+        else:
+            base = self._reserve(build_base_name(info.get("title"), _site_of(info)))
+        report({"base": base})
+        target = self._dir / f"{base}.{ext}"
 
         def progress_hook(d: dict) -> None:
             if is_cancelled():
@@ -133,6 +138,13 @@ class YtDlpDownloader:
             base = unique_base(self._dir, wanted, taken=self._reserved)
             self._reserved.add(base)
             return base
+
+    def _reserve_saved(self, saved: str) -> str:
+        with self._lock:
+            if saved in self._reserved:  # outro download ativo já usa esse nome
+                saved = unique_base(self._dir, saved, taken=self._reserved)
+            self._reserved.add(saved)
+            return saved
 
     def _release(self, base: str) -> None:
         with self._lock:

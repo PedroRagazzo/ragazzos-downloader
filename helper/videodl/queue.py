@@ -47,6 +47,7 @@ class Item:
     error_detail: str | None = None
     created_at: float = 0.0
     finished_at: float | None = None
+    base: str | None = None  # nome do arquivo sem extensão; permite retomar o .part após reiniciar
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -141,6 +142,7 @@ class DownloadQueue:
             item.progress = 0.0
             item.speed = None
             item.filename = None
+            item.base = None  # parciais já foram apagados no erro/cancelamento
             item.error_code = item.error_short = item.error_detail = None
             item.finished_at = None
             item.created_at = self._clock()
@@ -317,6 +319,10 @@ class DownloadQueue:
             title = update.get("title")
             if title and title != item.title:
                 item.title = title
+                changed = True
+            base = update.get("base")
+            if base and base != item.base:
+                item.base = base
                 changed = True
             if "progress" in update:
                 item.progress = max(0.0, min(1.0, float(update["progress"] or 0.0)))
