@@ -27,6 +27,25 @@ def test_limits_length():
     assert len(sanitize_title("a" * 300)) == 150
 
 
+def utf16_units(text):
+    return len(text.encode("utf-16-le")) // 2
+
+
+def test_limits_length_in_utf16_units_for_emoji_and_styled_letters():
+    # o NTFS conta unidades UTF-16; emoji e letras "estilizadas" valem 2 cada
+    for title in ("😀" * 300, "𝐇𝐞𝐥𝐥𝐨 " * 60):
+        result = sanitize_title(title)
+        assert 0 < utf16_units(result) <= 150
+        result.encode("utf-16-le")  # não corta um par substituto no meio
+
+
+def test_long_emoji_title_can_be_created_on_disk(tmp_path):
+    base = build_base_name("😀" * 300, "Instagram")
+    path = tmp_path / f"{base} (99).f999-9.mp4.part"
+    path.write_bytes(b"")
+    assert path.exists()
+
+
 def test_reserved_names_prefixed():
     assert sanitize_title("CON") == "_CON"
     assert sanitize_title("nul.txt") == "_nul.txt"

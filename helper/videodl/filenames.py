@@ -13,11 +13,21 @@ _INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _RESERVED = {"CON", "PRN", "AUX", "NUL"} | {f"COM{i}" for i in range(1, 10)} | {f"LPT{i}" for i in range(1, 10)}
 
 
+def _truncate_utf16(text: str, limit: int) -> str:
+    # o NTFS limita nomes em unidades UTF-16: emoji e letras "estilizadas" contam 2
+    units = 0
+    for i, ch in enumerate(text):
+        units += 2 if ord(ch) > 0xFFFF else 1
+        if units > limit:
+            return text[:i]
+    return text
+
+
 def sanitize_title(title: str | None) -> str:
     text = unicodedata.normalize("NFC", title or "")
     text = _INVALID.sub(" ", text)
     text = re.sub(r"\s+", " ", text).strip().rstrip(". ")
-    text = text[:MAX_TITLE].rstrip(". ")
+    text = _truncate_utf16(text, MAX_TITLE).rstrip(". ")
     if not text:
         return "video"
     if text.split(".")[0].upper() in _RESERVED:
