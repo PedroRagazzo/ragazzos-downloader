@@ -54,6 +54,20 @@ class Item:
 
 _FIELDS = {f.name for f in fields(Item)}
 
+_IO_RETRIES = 5
+_IO_DELAY = 0.1
+
+
+def _with_retries(action: Callable[[], object]):
+    # no Windows, antivírus e backup seguram arquivos por instantes (PermissionError)
+    for attempt in range(_IO_RETRIES):
+        try:
+            return action()
+        except PermissionError:
+            if attempt == _IO_RETRIES - 1:
+                raise
+            time.sleep(_IO_DELAY)
+
 Report = Callable[[dict], None]
 Downloader = Callable[[Item, Report, Callable[[], bool]], str]
 
@@ -170,7 +184,7 @@ class DownloadQueue:
 
     def _load(self) -> list[Item]:
         try:
-            raw = json.loads(self._store_path.read_text(encoding="utf-8"))
+            raw = json.loads(_with_retries(lambda: self._store_path.read_text(encoding="utf-8")))
             items = [Item(**{k: v for k, v in d.items() if k in _FIELDS}) for d in raw["items"]]
         except FileNotFoundError:
             return []
@@ -190,11 +204,15 @@ class DownloadQueue:
         return items
 
     def _save(self) -> None:
-        self._store_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self._store_path.with_name(self._store_path.name + ".tmp")
+        # falhar ao gravar não pode parar os downloads: o estado continua em memória e vai no próximo save
         payload = {"items": [item.to_dict() for item in self._items]}
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
-        os.replace(tmp, self._store_path)
+        tmp = self._store_path.with_name(self._store_path.name + ".tmp")
+        try:
+            self._store_path.parent.mkdir(parents=True, exist_ok=True)
+            _with_retries(lambda: tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8"))
+            _with_retries(lambda: os.replace(tmp, self._store_path))
+        except OSError:
+            log.exception("não consegui gravar %s", self._store_path)
 
     # ---- workers ----
 
@@ -236,7 +254,24 @@ class DownloadQueue:
                 item.progress = 0.0
                 item.error_short = None
                 self._save()
-            self._run(item)
+            try:
+                self._run(item)
+            except Exception:
+                log.exception("falha interna ao processar %s", item.url)
+                self._on_internal_error(item)
+
+    def _on_internal_error(self, item: Item) -> None:
+        # nunca deixar um item preso como "baixando": isso travaria a fila e o reinício pós-atualização
+        with self._cond:
+            self._cancel_requested.discard(item.id)
+            if item.status in RUNNING:
+                item.status = ERROR
+                item.speed = None
+                item.error_code = "unknown"
+                item.error_short = classify_error("").short
+                item.error_detail = "erro interno do programa — veja o log"
+                item.finished_at = self._clock()
+            self._cond.notify_all()
 
     def _run(self, item: Item) -> None:
         attempts = 0
