@@ -117,3 +117,19 @@ def test_active_count_ignores_waiting(tmp_path):
     q = make_queue(tmp_path)
     q.add(["https://youtu.be/a"], "video", "best")
     assert q.active_count() == 0
+
+
+def test_clear_finished_removes_only_finished_items(tmp_path):
+    q = make_queue(tmp_path)
+    [done_like, waiting], _ = q.add(["https://youtu.be/a", "https://youtu.be/b"], "video", "best")
+    q.cancel(done_like)
+    assert q.clear_finished() == 1
+    assert [i["id"] for i in q.list()] == [waiting]
+    assert [i["id"] for i in make_queue(tmp_path).list()] == [waiting]  # gravado no disco
+
+
+def test_clear_finished_with_nothing_to_clear(tmp_path):
+    q = make_queue(tmp_path)
+    q.add(["https://youtu.be/a"], "video", "best")
+    assert q.clear_finished() == 0
+    assert len(q.list()) == 1

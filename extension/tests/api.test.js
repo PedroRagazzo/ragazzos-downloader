@@ -46,3 +46,10 @@ test("servidor desligado vira ApiError offline", async () => {
   mockFetch(() => { throw new TypeError("Failed to fetch"); });
   await assert.rejects(api.status(), (err) => err instanceof ApiError && err.offline && err.message === "Programa não está rodando");
 });
+
+test("clearFinished pede POST /queue/clear", async () => {
+  const calls = mockFetch(() => json(200, { removed: 2 }));
+  assert.deepEqual(await api.clearFinished(), { removed: 2 });
+  assert.equal(calls[0].url, `${BASE}/queue/clear`);
+  assert.equal(calls[0].init.method, "POST");
+});

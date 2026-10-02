@@ -161,6 +161,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                 raise ApiError(400, str(exc)) from None
             return 200, {"added": added, "duplicates": duplicates}
 
+        if path == "/queue/clear" and method == "POST":
+            return 200, {"removed": queue.clear_finished()}
+
         match = _ITEM_ACTION.fullmatch(path)
         if method == "POST" and match:
             item_id, action = match.groups()

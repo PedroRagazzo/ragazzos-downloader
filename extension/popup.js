@@ -184,6 +184,7 @@ function renderQueue(items) {
   lastItems = items;
   $("queue").replaceChildren(...[...items].reverse().map(renderItem));
   $("queue-empty").hidden = items.length > 0;
+  $("clear-finished").hidden = !items.some((i) => !ACTIVE.includes(i.status));
   $("update-box").hidden = !items.some((i) => i.status === "error" && i.error_code === "extractor");
 }
 
@@ -207,6 +208,7 @@ async function refreshQueue() {
 // ---- botões gerais ----
 
 $("open-folder").addEventListener("click", () => api.openFolder().catch(showOffline));
+$("clear-finished").addEventListener("click", () => api.clearFinished().then(refreshQueue, showOffline));
 
 $("update-btn").addEventListener("click", async () => {
   const button = $("update-btn");

@@ -48,7 +48,10 @@
   <section>
     <div class="queue-head">
       <h2>Fila</h2>
-      <button type="button" id="open-folder" class="link">Abrir pasta</button>
+      <div class="queue-actions">
+        <button type="button" id="clear-finished" class="link" title="Tira da lista os concluídos, com erro e cancelados (os arquivos ficam)" hidden>Limpar</button>
+        <button type="button" id="open-folder" class="link">Abrir pasta</button>
+      </div>
     </div>
     <div id="update-box" class="banner banner-warn" hidden>
       Algum site mudou. <button type="button" id="update-btn" class="link">Atualizar yt-dlp</button>

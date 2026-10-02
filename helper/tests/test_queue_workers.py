@@ -199,3 +199,23 @@ def test_stop_leaves_running_item_to_resume(tmp_path):
     q.stop()
     reopened = DownloadQueue(tmp_path / "queue.json", downloader)
     assert item_of(reopened, item_id)["status"] == "waiting"
+
+
+def test_clear_finished_keeps_running_item(tmp_path):
+    started = threading.Event()
+
+    def downloader(item, report, is_cancelled):
+        started.set()
+        while not is_cancelled():
+            time.sleep(0.01)
+        raise Cancelled()
+
+    q = DownloadQueue(tmp_path / "queue.json", downloader, max_workers=1)
+    q.start()
+    try:
+        [running, waiting], _ = q.add(["https://youtu.be/a", "https://youtu.be/b"], "video", "best")
+        assert started.wait(3)
+        assert q.clear_finished() == 0
+        assert {i["id"] for i in q.list()} == {running, waiting}
+    finally:
+        q.stop()

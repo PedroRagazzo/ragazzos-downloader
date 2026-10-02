@@ -92,6 +92,7 @@ O popup consulta `GET /queue` a cada 1 s enquanto está aberto.
 | GET | `/queue` | — | `{items: [...]}` |
 | POST | `/queue/{id}/cancel` | — | item atualizado |
 | POST | `/queue/{id}/retry` | — | item atualizado |
+| POST | `/queue/clear` | — | `{removed: n}` — tira da lista concluídos, com erro e cancelados (arquivos ficam) |
 | POST | `/open-folder` | — | `{ok}` |
 | POST | `/update-ytdlp` | — | `{ok, version}` |
 

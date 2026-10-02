@@ -150,6 +150,16 @@ class DownloadQueue:
             self._cond.notify_all()
             return item.to_dict()
 
+    def clear_finished(self) -> int:
+        """Tira da lista os itens concluídos, com erro ou cancelados. Não apaga arquivos baixados."""
+        with self._cond:
+            before = len(self._items)
+            self._items = [i for i in self._items if i.status in ACTIVE]
+            removed = before - len(self._items)
+            if removed:
+                self._save()
+            return removed
+
     def active_count(self) -> int:
         with self._cond:
             return sum(1 for item in self._items if item.status in RUNNING)

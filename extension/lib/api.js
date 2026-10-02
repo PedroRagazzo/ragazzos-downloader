@@ -36,6 +36,7 @@ export const api = {
   queue: () => request("GET", "/queue"),
   cancel: (id) => request("POST", `/queue/${encodeURIComponent(id)}/cancel`),
   retry: (id) => request("POST", `/queue/${encodeURIComponent(id)}/retry`),
+  clearFinished: () => request("POST", "/queue/clear"),
   openFolder: () => request("POST", "/open-folder"),
   updateYtdlp: () => request("POST", "/update-ytdlp"),
 };

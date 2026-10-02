@@ -177,3 +177,19 @@ def test_second_server_on_same_port_fails(api):
     port = api.server.server_address[1]
     with pytest.raises(OSError):
         ApiServer(("127.0.0.1", port), api.queue, api.actions, ORIGIN)
+
+
+def test_clear_finished_endpoint(api):
+    [done_like, waiting], _ = api.queue.add(["https://youtu.be/a", "https://youtu.be/b"], "video", "best")
+    api.queue.cancel(done_like)
+    status, body, _ = api.call("POST", "/queue/clear")
+    assert status == 200 and body == {"removed": 1}
+    assert [i["id"] for i in api.queue.list()] == [waiting]
+
+
+def test_clear_finished_endpoint_rejects_requests_from_outside(api):
+    [item_id], _ = api.queue.add(["https://youtu.be/a"], "video", "best")
+    api.queue.cancel(item_id)
+    assert api.call("POST", "/queue/clear", origin="https://evil.example")[0] == 403
+    assert api.call("POST", "/queue/clear", origin=None, marker=False)[0] == 403
+    assert len(api.queue.list()) == 1
