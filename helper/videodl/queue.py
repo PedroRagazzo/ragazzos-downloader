@@ -195,3 +195,124 @@ class DownloadQueue:
         payload = {"items": [item.to_dict() for item in self._items]}
         tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
         os.replace(tmp, self._store_path)
+
+    # ---- workers ----
+
+    def start(self) -> None:
+        with self._cond:
+            self._stopping = False
+        for n in range(self._max_workers):
+            worker = threading.Thread(target=self._worker, name=f"download-{n + 1}", daemon=True)
+            worker.start()
+            self._workers.append(worker)
+
+    def stop(self, timeout: float = 5.0) -> None:
+        with self._cond:
+            self._stopping = True
+            self._cond.notify_all()
+        for worker in self._workers:
+            worker.join(timeout)
+        self._workers.clear()
+
+    def pause(self) -> None:
+        with self._cond:
+            self._paused = True
+
+    def _next_waiting(self) -> Item | None:
+        if self._paused or self._stopping:
+            return None
+        return next((i for i in self._items if i.status == WAITING), None)
+
+    def _worker(self) -> None:
+        while True:
+            with self._cond:
+                item = self._next_waiting()
+                while item is None:
+                    if self._stopping:
+                        return
+                    self._cond.wait()
+                    item = self._next_waiting()
+                item.status = DOWNLOADING
+                item.progress = 0.0
+                item.error_short = None
+                self._save()
+            self._run(item)
+
+    def _run(self, item: Item) -> None:
+        attempts = 0
+        while True:
+            try:
+                path = self._downloader(
+                    replace(item),
+                    lambda update: self._report(item, update),
+                    lambda: self._is_cancelled(item.id),
+                )
+            except Cancelled:
+                self._on_cancelled(item)
+                return
+            except Exception as exc:  # qualquer falha do download vira erro do item
+                if self._is_cancelled(item.id):
+                    self._on_cancelled(item)
+                    return
+                info = classify_error(str(exc))
+                if info.retryable and attempts < len(self._retry_delays):
+                    with self._cond:
+                        item.error_short = info.short
+                    self._sleep(self._retry_delays[attempts])
+                    attempts += 1
+                    if self._is_cancelled(item.id):
+                        self._on_cancelled(item)
+                        return
+                    continue
+                log.warning("download falhou (%s): %s", item.url, exc)
+                self._on_error(item, info, str(exc))
+                return
+            self._on_done(item, path)
+            return
+
+    def _report(self, item: Item, update: dict) -> None:
+        with self._cond:
+            if item.status not in RUNNING:
+                return
+            changed = False
+            status = update.get("status")
+            if status in RUNNING and status != item.status:
+                item.status = status
+                changed = True
+            title = update.get("title")
+            if title and title != item.title:
+                item.title = title
+                changed = True
+            if "progress" in update:
+                item.progress = max(0.0, min(1.0, float(update["progress"] or 0.0)))
+            if "speed" in update:
+                item.speed = update["speed"]
+            if changed:
+                self._save()
+
+    def _is_cancelled(self, item_id: str) -> bool:
+        with self._cond:
+            return item_id in self._cancel_requested or self._stopping
+
+    def _on_cancelled(self, item: Item) -> None:
+        with self._cond:
+            requested = item.id in self._cancel_requested
+            self._cancel_requested.discard(item.id)
+            if self._stopping and not requested:
+                return  # o programa está fechando: o item volta como "aguardando" na próxima abertura
+            self._finish(item, CANCELLED)
+
+    def _on_error(self, item: Item, info: ErrorInfo, detail: str) -> None:
+        with self._cond:
+            item.error_code = info.code
+            item.error_short = info.short
+            item.error_detail = detail
+            self._finish(item, ERROR)
+
+    def _on_done(self, item: Item, path: str) -> None:
+        with self._cond:
+            self._cancel_requested.discard(item.id)
+            item.filename = path
+            item.progress = 1.0
+            item.error_code = item.error_short = item.error_detail = None
+            self._finish(item, DONE)
