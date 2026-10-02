@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-SHORTCUT_NAME = "Video Downloader.lnk"
+SHORTCUT_NAME = "Ragazzo's Downloader.lnk"
+LEGACY_SHORTCUT_NAME = "Video Downloader.lnk"  # nome antes do rename
 HELPER_DIR = Path(__file__).resolve().parent.parent
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
@@ -42,7 +43,7 @@ def create_shortcut(link: Path, run: Callable = subprocess.run) -> None:
         f"$s.TargetPath = {_ps_quote(_pythonw())};"
         "$s.Arguments = '-m videodl';"
         f"$s.WorkingDirectory = {_ps_quote(HELPER_DIR)};"
-        "$s.Description = 'Vídeo Downloader';"
+        "$s.Description = 'Ragazzo''s Downloader';"
         "$s.Save()"
     )
     run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
@@ -59,8 +60,11 @@ def enable(run: Callable = subprocess.run) -> None:
 
 def disable() -> None:
     startup_shortcut().unlink(missing_ok=True)
+    (_programs_dir() / "Startup" / LEGACY_SHORTCUT_NAME).unlink(missing_ok=True)
 
 
 def install_shortcuts(run: Callable = subprocess.run) -> None:
+    for old in (_programs_dir() / LEGACY_SHORTCUT_NAME, _programs_dir() / "Startup" / LEGACY_SHORTCUT_NAME):
+        old.unlink(missing_ok=True)
     create_shortcut(start_menu_shortcut(), run)
     enable(run)

@@ -1,4 +1,4 @@
-﻿# Instala o Vídeo Downloader: venv + dependências, ffmpeg, atalhos e inicia o programa.
+﻿# Instala o Ragazzo's Downloader: venv + dependências, ffmpeg, atalhos e inicia o programa.
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $helper = Join-Path $root "helper"

@@ -24,4 +24,4 @@ def build_icon(actions, on_quit: Callable[[], None], on_update: Callable[[], Non
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Sair", lambda icon, item: on_quit()),
     )
-    return pystray.Icon("video-downloader", draw_icon(64), "Vídeo Downloader", menu)
+    return pystray.Icon("video-downloader", draw_icon(64), "Ragazzo's Downloader", menu)

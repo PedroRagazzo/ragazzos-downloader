@@ -106,7 +106,7 @@ class App:
         self.queue.start()
         threading.Thread(target=self.server.serve_forever, name="api", daemon=True).start()
         threading.Thread(target=self._auto_update, name="auto-update", daemon=True).start()
-        log.info("Vídeo Downloader %s ouvindo em 127.0.0.1:%d", __version__, PORT)
+        log.info("Ragazzo's Downloader %s ouvindo em 127.0.0.1:%d", __version__, PORT)
 
         from .tray import build_icon  # import tardio: pystray só é necessário aqui
 
@@ -157,7 +157,7 @@ class App:
             except Exception as exc:
                 message = f"Falha ao atualizar: {exc}"
             if self.icon is not None:
-                self.icon.notify(message, "Vídeo Downloader")
+                self.icon.notify(message, "Ragazzo's Downloader")
 
         threading.Thread(target=work, name="tray-update", daemon=True).start()
 
