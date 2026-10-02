@@ -95,7 +95,7 @@ O popup consulta `GET /queue` a cada 1 s enquanto está aberto.
 | POST | `/open-folder` | — | `{ok}` |
 | POST | `/update-ytdlp` | — | `{ok, version}` |
 
-Item da fila: `{id, url, mode, quality, status, title, progress (0–1), speed, filename, error_short, error_detail, created_at}`.
+Item da fila: `{id, url, mode, quality, status, title, progress (0–1), speed, filename, error_code, error_short, error_detail, created_at, finished_at}`. `error_code` (`unsupported`, `private`, `unavailable`, `network`, `extractor`, `disk`, `ffmpeg`, `unknown`) permite ao popup mostrar o botão **Atualizar yt-dlp** quando for `extractor`.
 
 ### Fila
 - Até **2 downloads simultâneos**; demais aguardam (FIFO).
