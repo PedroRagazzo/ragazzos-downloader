@@ -18,6 +18,20 @@ test("parseLinks aceita CRLF, parênteses e ignora ftp", () => {
   });
 });
 
+test("parseLinks remove marcas de formatação do WhatsApp e caracteres invisíveis", () => {
+  const text = "*https://youtu.be/abc1*\n~https://youtu.be/abc2~\nhttps://youtu.be/abc3‎\nhttps://youtu.be/abc4​。";
+  assert.deepEqual(parseLinks(text).urls, [
+    "https://youtu.be/abc1",
+    "https://youtu.be/abc2",
+    "https://youtu.be/abc3",
+    "https://youtu.be/abc4",
+  ]);
+});
+
+test("parseLinks mantém _ que faz parte do ID", () => {
+  assert.deepEqual(parseLinks("https://youtu.be/abc_").urls, ["https://youtu.be/abc_"]);
+});
+
 test("parseLinks com texto vazio", () => {
   assert.deepEqual(parseLinks("  \n "), { urls: [], ignored: 0 });
 });

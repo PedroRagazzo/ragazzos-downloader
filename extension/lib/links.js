@@ -44,8 +44,10 @@ export function isLikelyVideoUrl(url) {
   return false;
 }
 
-const URL_IN_TEXT = /https?:\/\/[^\s<>"']+/gi;
-const TRAILING_PUNCTUATION = /[.,;:!?)\]}»"'…]+$/;
+// caracteres invisíveis (U+200B–U+200F, U+FEFF) e o ponto japonês "。" encerram o link
+const URL_IN_TEXT = /https?:\/\/[^\s<>"'​-‏﻿。]+/gi;
+// * e ~ são as marcas de negrito/tachado do WhatsApp; _ não entra porque aparece em IDs de vídeo
+const TRAILING_PUNCTUATION = /[.,;:!?)\]}»"'…*~]+$/;
 
 export function parseLinks(text) {
   const urls = [];
