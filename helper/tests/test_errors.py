@@ -17,6 +17,7 @@ from videodl.errors import classify_error
         ("ERROR: Read timed out.", "network"),
         ("ERROR: [youtube] abc: Sign in to confirm you’re not a bot. Use --cookies-from-browser", "extractor"),
         ("ERROR: [TikTok] 123: Unable to extract webpage video data; please report this issue on https://github.com/yt-dlp/yt-dlp/issues", "extractor"),
+        ("ERROR: unable to download video data: HTTP Error 403: Forbidden", "extractor"),
         ("ERROR: [youtube] abc: Private video. Sign in if you've been granted access to this video", "private"),
         ("ERROR: [Instagram] xyz: Requested content is not available, rate-limit reached or login required", "private"),
         ("algo totalmente diferente", "unknown"),

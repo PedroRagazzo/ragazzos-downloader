@@ -34,9 +34,15 @@ def make_factory(info, *, fail_on_download=None):
         def extract_info(self, url, download=False):
             if isinstance(info, Exception):
                 raise info
+            if download:
+                self._fake_download()
             return copy.deepcopy(info)
 
         def process_ie_result(self, entry, download=True):
+            # como no yt-dlp real: links resolvidos em outra instância dão 403 ao baixar
+            raise RuntimeError("ERROR: unable to download video data: HTTP Error 403: Forbidden")
+
+        def _fake_download(self):
             template = self.params["outtmpl"]["default"]
             assert template.endswith(".%(ext)s")
             base = template[: -len(".%(ext)s")].replace("%%", "%")
@@ -51,7 +57,6 @@ def make_factory(info, *, fail_on_download=None):
             part.unlink()
             audio = any(pp["key"] == "FFmpegExtractAudio" for pp in self.params.get("postprocessors", []))
             Path(base + (".mp3" if audio else ".mp4")).write_bytes(b"media")
-            return entry
 
     return FakeYDL, calls
 

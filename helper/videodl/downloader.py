@@ -114,8 +114,9 @@ class YtDlpDownloader:
             "postprocessor_hooks": [postprocessor_hook],
         }
         try:
+            # extrai de novo nesta instância: links resolvidos em outra instância dão 403 no YouTube
             with self._factory(opts) as ydl:
-                ydl.process_ie_result(info, download=True)
+                ydl.extract_info(item.url, download=True)
             if not target.exists():
                 raise RuntimeError(f"arquivo final não encontrado: {target.name}")
             return str(target)

@@ -30,7 +30,7 @@ _RULES = (
                  "urlopen error", "incompleteread", "winerror 10054", "winerror 10060"),
      "Falha de conexão, tentando de novo…", True),
     ("extractor", ("not a bot", "unable to extract", "please report this issue", "signature", "nsig",
-                   "unable to download api page", "unable to download webpage", "jsinterp"),
+                   "unable to download api page", "unable to download webpage", "jsinterp", "http error 403"),
      "O site mudou — clique em Atualizar", False),
     ("private", ("private", "login required", "log in", "login", "sign in", "requires authentication",
                  "--cookies", "age-restricted", "confirm your age"),
