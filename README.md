@@ -1,6 +1,6 @@
 # Ragazzo's Downloader
 
-Extensão para Brave/Opera/Chrome/Edge + programa local que baixa vídeos (MP4) e áudios (MP3)
+Extensão para Brave/Opera/Chrome/Edge + programa local que baixa vídeos (MP4, MKV, MOV) e áudios (MP3, WAV, FLAC)
 do YouTube, TikTok, Instagram e Pinterest. Só conteúdo público; uso pessoal.
 
 A extensão é só a interface. Quem baixa é um programa em Python que roda no seu PC
@@ -34,7 +34,18 @@ O programa fica no ícone vermelho perto do relógio e abre sozinho com o Window
 
 - **Na página do vídeo:** clique no ícone da extensão → **Adicionar**.
 - **Colar links:** cole um ou vários (um por linha) → **Adicionar à fila**.
-- Escolha 🎬 Vídeo ou 🎵 Áudio e a qualidade antes de adicionar.
+- Antes de adicionar, escolha 🎬 Vídeo ou 🎵 Áudio, o formato e a qualidade:
+
+  | Formato | Quando usar |
+  |---|---|
+  | **MP4** (padrão) | Toca em qualquer lugar: Windows, celular, WhatsApp. Prefere H.264/AAC. |
+  | **MOV** | Mesma escolha do MP4 em contêiner da Apple (iPhone/Mac, editores de vídeo). |
+  | **MKV** | Guarda vídeo e áudio originais, sem converter. Maior qualidade; alguns celulares não abrem. |
+  | **MP3** (padrão) | Toca em qualquer lugar; escolha 320, 192 ou 128 kbps. |
+  | **WAV** | Áudio sem compressão, para edição. Arquivo grande; sem escolha de kbps. |
+  | **FLAC** | Áudio sem perdas, menor que o WAV; sem escolha de kbps. |
+
+  A última escolha fica salva.
 - Os arquivos vão para `Downloads\Video Downloader`.
 
 ## Problemas comuns
