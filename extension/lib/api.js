@@ -32,7 +32,7 @@ async function request(method, path, body) {
 export const api = {
   status: () => request("GET", "/status"),
   info: (url) => request("GET", `/info?url=${encodeURIComponent(url)}`),
-  addToQueue: (urls, mode, quality) => request("POST", "/queue", { urls, mode, quality }),
+  addToQueue: (urls, mode, quality, ext) => request("POST", "/queue", { urls, mode, quality, ext }),
   queue: () => request("GET", "/queue"),
   cancel: (id) => request("POST", `/queue/${encodeURIComponent(id)}/cancel`),
   retry: (id) => request("POST", `/queue/${encodeURIComponent(id)}/retry`),

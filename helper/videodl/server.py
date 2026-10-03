@@ -156,7 +156,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 raise ApiError(400, f"no máximo {MAX_URLS} links por vez")
             clean = [_require_http_url(u) for u in urls]
             try:
-                added, duplicates = queue.add(clean, body.get("mode"), body.get("quality"))
+                added, duplicates = queue.add(clean, body.get("mode"), body.get("quality"), body.get("ext"))
             except InvalidOptions as exc:
                 raise ApiError(400, str(exc)) from None
             return 200, {"added": added, "duplicates": duplicates}

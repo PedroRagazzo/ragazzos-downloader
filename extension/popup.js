@@ -1,6 +1,6 @@
 import { api, ApiError } from "./lib/api.js";
 import { isLikelyVideoUrl, parseLinks } from "./lib/links.js";
-import { formatSpeed, percent, qualityLabel, qualityOptions, statusLabel } from "./lib/format.js";
+import { formatOptions, formatSpeed, isLossless, itemLabel, percent, qualityOptions, statusLabel } from "./lib/format.js";
 import { loadPrefs, savePrefs } from "./lib/prefs.js";
 
 const $ = (id) => document.getElementById(id);
@@ -37,9 +37,13 @@ function renderOptions() {
     button.classList.toggle("active", on);
     button.setAttribute("aria-checked", String(on));
   }
+  const format = $("format");
+  format.replaceChildren(...formatOptions(prefs.mode).map(([value, label]) => new Option(label, value)));
+  format.value = prefs.ext;
   const select = $("quality");
   select.replaceChildren(...qualityOptions(prefs.mode).map(([value, label]) => new Option(label, value)));
   select.value = prefs.quality;
+  select.hidden = isLossless(prefs.ext);  // WAV/FLAC não têm kbps
 }
 
 async function setPrefs(next) {
@@ -51,10 +55,11 @@ async function setPrefs(next) {
 for (const button of document.querySelectorAll("[data-mode]")) {
   button.addEventListener("click", () => {
     const mode = button.dataset.mode;
-    if (mode !== prefs.mode) setPrefs({ mode, quality: qualityOptions(mode)[0][0] });
+    if (mode !== prefs.mode) setPrefs({ mode, quality: qualityOptions(mode)[0][0], ext: formatOptions(mode)[0][0] });
   });
 }
 $("quality").addEventListener("change", (event) => setPrefs({ ...prefs, quality: event.target.value }));
+$("format").addEventListener("change", (event) => setPrefs({ ...prefs, ext: event.target.value }));
 
 // ---- conexão ----
 
@@ -80,7 +85,7 @@ async function checkStatus() {
 
 async function addUrls(urls) {
   try {
-    const result = await api.addToQueue(urls, prefs.mode, prefs.quality);
+    const result = await api.addToQueue(urls, prefs.mode, prefs.quality, prefs.ext);
     const parts = [];
     if (result.added.length) parts.push(`${result.added.length} adicionado(s)`);
     if (result.duplicates) parts.push(`${result.duplicates} já estava(m) na fila`);
@@ -136,7 +141,7 @@ function renderItem(item) {
   const title = el("div", "item-title", item.title || item.url);
   title.title = item.url;
 
-  const bits = [`${item.mode === "audio" ? "🎵" : "🎬"} ${qualityLabel(item.mode, item.quality)}`, statusLabel(item.status)];
+  const bits = [itemLabel(item), statusLabel(item.status)];
   if (item.status === "downloading") {
     bits.push(percent(item.progress));
     const speed = formatSpeed(item.speed);

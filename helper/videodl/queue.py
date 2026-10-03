@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Callable
 
 from .errors import ErrorInfo, classify_error
-from .formats import validate
+from .formats import final_extension, validate
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +48,7 @@ class Item:
     created_at: float = 0.0
     finished_at: float | None = None
     base: str | None = None  # nome do arquivo sem extensão; permite retomar o .part após reiniciar
+    ext: str | None = None  # formato do arquivo final (mp4, mkv, mov, mp3, wav, flac)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -101,16 +102,18 @@ class DownloadQueue:
 
     # ---- API pública ----
 
-    def add(self, urls: list[str], mode: str, quality: str) -> tuple[list[str], int]:
-        validate(mode, quality)
+    def add(self, urls: list[str], mode: str, quality: str, ext: str | None = None) -> tuple[list[str], int]:
+        validate(mode, quality, ext)
+        ext = final_extension(mode, ext)
         added: list[str] = []
         duplicates = 0
         with self._cond:
             for url in urls:
-                if self._has_active_duplicate(url, mode, quality):
+                if self._has_active_duplicate(url, mode, quality, ext):
                     duplicates += 1
                     continue
-                item = Item(id=uuid.uuid4().hex[:12], url=url, mode=mode, quality=quality, created_at=self._clock())
+                item = Item(id=uuid.uuid4().hex[:12], url=url, mode=mode, quality=quality, ext=ext,
+                            created_at=self._clock())
                 self._items.append(item)
                 added.append(item.id)
             if added:
@@ -172,9 +175,9 @@ class DownloadQueue:
                 return item
         raise KeyError(item_id)
 
-    def _has_active_duplicate(self, url: str, mode: str, quality: str) -> bool:
+    def _has_active_duplicate(self, url: str, mode: str, quality: str, ext: str) -> bool:
         return any(
-            i.url == url and i.mode == mode and i.quality == quality and i.status in ACTIVE
+            i.url == url and i.mode == mode and i.quality == quality and i.ext == ext and i.status in ACTIVE
             for i in self._items
         )
 
@@ -209,6 +212,7 @@ class DownloadQueue:
                 log.exception("não consegui guardar o queue.json inválido")
             return []
         for item in items:
+            item.ext = item.ext or final_extension(item.mode)  # itens de antes da escolha de formato
             if item.status in RUNNING:
                 item.status = WAITING
                 item.progress = 0.0

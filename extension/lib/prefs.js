@@ -1,12 +1,19 @@
-import { qualityOptions } from "./format.js";
+import { formatOptions, qualityOptions } from "./format.js";
 
-export const DEFAULT_PREFS = { mode: "video", quality: "best" };
+export const DEFAULT_PREFS = { mode: "video", quality: "best", ext: "mp4" };
+
+function pick(options, value) {
+  const values = options.map(([v]) => v);
+  return values.includes(value) ? value : values[0];
+}
 
 export function normalizePrefs(raw) {
   const mode = raw?.mode === "audio" ? "audio" : "video";
-  const values = qualityOptions(mode).map(([value]) => value);
-  const quality = values.includes(raw?.quality) ? raw.quality : values[0];
-  return { mode, quality };
+  return {
+    mode,
+    quality: pick(qualityOptions(mode), raw?.quality),
+    ext: pick(formatOptions(mode), raw?.ext),
+  };
 }
 
 export async function loadPrefs(storage) {

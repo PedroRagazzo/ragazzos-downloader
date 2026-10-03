@@ -47,7 +47,9 @@ select, textarea {
   font: inherit; color: var(--fg); background: var(--bg);
   border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px;
 }
-select { flex: 1; }
+select { flex: 1; min-width: 0; }
+select#format { flex: 0 0 auto; }
+[hidden] { display: none !important; }
 textarea { width: 100%; resize: vertical; }
 .card { background: var(--card); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
 .label { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }

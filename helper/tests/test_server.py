@@ -193,3 +193,20 @@ def test_clear_finished_endpoint_rejects_requests_from_outside(api):
     assert api.call("POST", "/queue/clear", origin="https://evil.example")[0] == 403
     assert api.call("POST", "/queue/clear", origin=None, marker=False)[0] == 403
     assert len(api.queue.list()) == 1
+
+
+def test_add_with_format(api):
+    status, body, _ = api.call("POST", "/queue", {"urls": ["https://youtu.be/a"], "mode": "audio", "quality": "320", "ext": "flac"})
+    assert status == 200 and len(body["added"]) == 1
+    assert api.queue.list()[0]["ext"] == "flac"
+
+
+def test_add_without_format_uses_default(api):
+    api.call("POST", "/queue", {"urls": ["https://youtu.be/a"], "mode": "video", "quality": "best"})
+    assert api.queue.list()[0]["ext"] == "mp4"
+
+
+def test_add_rejects_invalid_format(api):
+    status, body, _ = api.call("POST", "/queue", {"urls": ["https://youtu.be/a"], "mode": "video", "quality": "best", "ext": "exe"})
+    assert status == 400 and body["error"]
+    assert api.queue.list() == []

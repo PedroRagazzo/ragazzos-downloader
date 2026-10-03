@@ -133,3 +133,33 @@ def test_clear_finished_with_nothing_to_clear(tmp_path):
     q.add(["https://youtu.be/a"], "video", "best")
     assert q.clear_finished() == 0
     assert len(q.list()) == 1
+
+
+def test_add_stores_chosen_format(tmp_path):
+    q = make_queue(tmp_path)
+    q.add(["https://youtu.be/a"], "video", "720", "mkv")
+    q.add(["https://youtu.be/b"], "audio", "320")
+    assert [i["ext"] for i in q.list()] == ["mkv", "mp3"]
+    assert [i["ext"] for i in make_queue(tmp_path).list()] == ["mkv", "mp3"]
+
+
+def test_same_url_in_other_format_is_not_duplicate(tmp_path):
+    q = make_queue(tmp_path)
+    q.add(["https://youtu.be/a"], "video", "720", "mp4")
+    added, dup = q.add(["https://youtu.be/a"], "video", "720", "mkv")
+    assert len(added) == 1 and dup == 0
+    added, dup = q.add(["https://youtu.be/a"], "video", "720")  # sem formato = mp4
+    assert added == [] and dup == 1
+
+
+def test_invalid_format_raises(tmp_path):
+    with pytest.raises(InvalidOptions):
+        make_queue(tmp_path).add(["https://youtu.be/a"], "audio", "320", "mkv")
+
+
+def test_old_items_without_format_load_as_default(tmp_path):
+    (tmp_path / "queue.json").write_text(json.dumps({"items": [{
+        "id": "x1", "url": "https://youtu.be/a", "mode": "audio", "quality": "192", "status": "waiting",
+    }]}), encoding="utf-8")
+    [item] = make_queue(tmp_path).list()
+    assert item["ext"] == "mp3"

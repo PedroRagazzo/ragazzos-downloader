@@ -16,11 +16,11 @@ const json = (status, body) =>
 
 test("addToQueue envia JSON por POST", async () => {
   const calls = mockFetch(() => json(200, { added: ["a"], duplicates: 0 }));
-  const result = await api.addToQueue(["https://youtu.be/x"], "audio", "192");
+  const result = await api.addToQueue(["https://youtu.be/x"], "audio", "192", "flac");
   assert.deepEqual(result, { added: ["a"], duplicates: 0 });
   assert.equal(calls[0].url, `${BASE}/queue`);
   assert.equal(calls[0].init.method, "POST");
-  assert.deepEqual(JSON.parse(calls[0].init.body), { urls: ["https://youtu.be/x"], mode: "audio", quality: "192" });
+  assert.deepEqual(JSON.parse(calls[0].init.body), { urls: ["https://youtu.be/x"], mode: "audio", quality: "192", ext: "flac" });
 });
 
 test("todo pedido leva o cabeçalho que identifica a extensão", async () => {

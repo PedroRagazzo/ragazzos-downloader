@@ -55,14 +55,16 @@ def make_factory(info, *, fail_on_download=None):
             for hook in self.params["postprocessor_hooks"]:
                 hook({"status": "started"})
             part.unlink()
-            audio = any(pp["key"] == "FFmpegExtractAudio" for pp in self.params.get("postprocessors", []))
-            Path(base + (".mp3" if audio else ".mp4")).write_bytes(b"media")
+            # como o yt-dlp: áudio sai no codec pedido, vídeo no contêiner de saída
+            extract = [pp for pp in self.params.get("postprocessors", []) if pp["key"] == "FFmpegExtractAudio"]
+            ext = extract[0]["preferredcodec"] if extract else self.params["merge_output_format"]
+            Path(base + "." + ext).write_bytes(b"media")
 
     return FakeYDL, calls
 
 
-def make_item(mode="video", quality="720"):
-    return Item(id="i1", url="https://youtu.be/a", mode=mode, quality=quality)
+def make_item(mode="video", quality="720", ext=None):
+    return Item(id="i1", url="https://youtu.be/a", mode=mode, quality=quality, ext=ext)
 
 
 def test_downloads_video_with_readable_name(tmp_path):
@@ -173,3 +175,19 @@ def test_get_info(tmp_path):
     factory, _ = make_factory(INFO)
     info = YtDlpDownloader(tmp_path, ydl_factory=factory).get_info("https://youtu.be/a")
     assert info == {"title": "Meu vídeo", "thumbnail": "https://i.ytimg.com/x.jpg", "site": "youtube"}
+
+
+@pytest.mark.parametrize("mode,quality,ext", [
+    ("video", "720", "mkv"), ("video", "best", "mov"), ("audio", "320", "wav"), ("audio", "128", "flac"),
+])
+def test_downloads_in_chosen_format(tmp_path, mode, quality, ext):
+    factory, calls = make_factory(INFO)
+    path = YtDlpDownloader(tmp_path, ydl_factory=factory)(make_item(mode, quality, ext), lambda u: None, lambda: False)
+    assert Path(path) == tmp_path / f"Meu vídeo [youtube].{ext}"
+    assert Path(path).read_bytes() == b"media"
+
+
+def test_item_without_format_still_downloads_mp4(tmp_path):
+    factory, _ = make_factory(INFO)
+    path = YtDlpDownloader(tmp_path, ydl_factory=factory)(make_item(ext=None), lambda u: None, lambda: False)
+    assert Path(path).suffix == ".mp4"

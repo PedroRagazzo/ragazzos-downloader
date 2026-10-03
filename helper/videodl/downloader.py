@@ -88,7 +88,7 @@ class YtDlpDownloader:
             raise Cancelled()
         report({"title": info.get("title") or item.url})
 
-        ext = final_extension(item.mode)
+        ext = final_extension(item.mode, item.ext)
         if item.base and not (self._dir / f"{item.base}.{ext}").exists():
             base = self._reserve_saved(item.base)  # retomada: mesmo nome, o yt-dlp continua o .part
         else:
@@ -113,7 +113,7 @@ class YtDlpDownloader:
 
         opts = {
             **self._base_opts(),
-            **build_format_opts(item.mode, item.quality),
+            **build_format_opts(item.mode, item.quality, item.ext),
             "outtmpl": {"default": str(self._dir / base).replace("%", "%%") + ".%(ext)s"},
             "progress_hooks": [progress_hook],
             "postprocessor_hooks": [postprocessor_hook],
