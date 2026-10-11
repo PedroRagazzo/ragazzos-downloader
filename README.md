@@ -41,6 +41,10 @@ O programa fica no ícone vermelho perto do relógio e abre sozinho com o Window
 
 - **Na página do vídeo:** clique no ícone da extensão → **Adicionar**.
 - **Colar links:** cole um ou vários (um por linha) → **Adicionar à fila**.
+- **Botão direito:** num link de vídeo ou na página do vídeo (YouTube, TikTok, Instagram, Pinterest) →
+  **Ragazzo's Downloader ▸ Baixar vídeo** ou **Baixar áudio**. Usa a última escolha de formato/qualidade
+  de cada tipo; o ícone da extensão mostra ✓ quando entra na fila (ou ! com o motivo, ao passar o mouse).
+  No player do YouTube, clique com o botão direito duas vezes para abrir o menu do navegador.
 - Antes de adicionar, escolha 🎬 Vídeo ou 🎵 Áudio, o formato e a qualidade:
 
   | Formato | Quando usar |

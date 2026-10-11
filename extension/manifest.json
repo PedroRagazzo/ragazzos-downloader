@@ -17,9 +17,14 @@
       "32": "icons/icon32.png"
     }
   },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "contextMenus"
   ],
   "host_permissions": [
     "http://127.0.0.1:47321/*"

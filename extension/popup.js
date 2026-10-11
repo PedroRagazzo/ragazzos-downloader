@@ -1,12 +1,12 @@
 import { api, ApiError } from "./lib/api.js";
 import { isLikelyVideoUrl, parseLinks } from "./lib/links.js";
 import { formatOptions, isLossless, qualityOptions } from "./lib/format.js";
-import { loadPrefs, savePrefs } from "./lib/prefs.js";
+import { activeChoice, DEFAULT_PREFS, loadPrefs, savePrefs, switchMode, updateChoice } from "./lib/prefs.js";
 import { createQueueView } from "./lib/queueview.js";
 
 const $ = (id) => document.getElementById(id);
 const storage = chrome.storage.local;
-let prefs = { mode: "video", quality: "best", ext: "mp4" };
+let prefs = DEFAULT_PREFS;
 let online = false;
 let pageLoaded = false;
 
@@ -18,13 +18,14 @@ function renderOptions() {
     button.classList.toggle("active", on);
     button.setAttribute("aria-checked", String(on));
   }
+  const choice = activeChoice(prefs);
   const format = $("format");
-  format.replaceChildren(...formatOptions(prefs.mode).map(([value, label]) => new Option(label, value)));
-  format.value = prefs.ext;
+  format.replaceChildren(...formatOptions(choice.mode).map(([value, label]) => new Option(label, value)));
+  format.value = choice.ext;
   const select = $("quality");
-  select.replaceChildren(...qualityOptions(prefs.mode).map(([value, label]) => new Option(label, value)));
-  select.value = prefs.quality;
-  select.hidden = isLossless(prefs.ext);  // WAV/FLAC não têm kbps
+  select.replaceChildren(...qualityOptions(choice.mode).map(([value, label]) => new Option(label, value)));
+  select.value = choice.quality;
+  select.hidden = isLossless(choice.ext);  // WAV/FLAC não têm kbps
 }
 
 async function setPrefs(next) {
@@ -36,11 +37,11 @@ async function setPrefs(next) {
 for (const button of document.querySelectorAll("[data-mode]")) {
   button.addEventListener("click", () => {
     const mode = button.dataset.mode;
-    if (mode !== prefs.mode) setPrefs({ mode, quality: qualityOptions(mode)[0][0], ext: formatOptions(mode)[0][0] });
+    if (mode !== prefs.mode) setPrefs(switchMode(prefs, mode));  // volta a última escolha daquele tipo
   });
 }
-$("quality").addEventListener("change", (event) => setPrefs({ ...prefs, quality: event.target.value }));
-$("format").addEventListener("change", (event) => setPrefs({ ...prefs, ext: event.target.value }));
+$("quality").addEventListener("change", (event) => setPrefs(updateChoice(prefs, { quality: event.target.value })));
+$("format").addEventListener("change", (event) => setPrefs(updateChoice(prefs, { ext: event.target.value })));
 
 // ---- conexão ----
 
@@ -66,7 +67,8 @@ async function checkStatus() {
 
 async function addUrls(urls) {
   try {
-    const result = await api.addToQueue(urls, prefs.mode, prefs.quality, prefs.ext);
+    const { mode, quality, ext } = activeChoice(prefs);
+    const result = await api.addToQueue(urls, mode, quality, ext);
     const parts = [];
     if (result.added.length) parts.push(`${result.added.length} adicionado(s)`);
     if (result.duplicates) parts.push(`${result.duplicates} já estava(m) na fila`);
