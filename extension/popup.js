@@ -1,33 +1,14 @@
 import { api, ApiError } from "./lib/api.js";
 import { isLikelyVideoUrl, parseLinks } from "./lib/links.js";
-import { formatOptions, formatSpeed, isLossless, itemLabel, percent, qualityOptions, statusLabel } from "./lib/format.js";
+import { formatOptions, isLossless, qualityOptions } from "./lib/format.js";
 import { loadPrefs, savePrefs } from "./lib/prefs.js";
+import { createQueueView } from "./lib/queueview.js";
 
 const $ = (id) => document.getElementById(id);
 const storage = chrome.storage.local;
-const RUNNING = ["downloading", "converting"];
-const ACTIVE = ["waiting", ...RUNNING];
-
-let prefs = { mode: "video", quality: "best" };
+let prefs = { mode: "video", quality: "best", ext: "mp4" };
 let online = false;
 let pageLoaded = false;
-let lastItems = [];
-let lastKey = "";
-const expanded = new Set();
-
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-function linkButton(label, onClick) {
-  const button = el("button", "link", label);
-  button.type = "button";
-  button.addEventListener("click", onClick);
-  return button;
-}
 
 // ---- opções ----
 
@@ -136,62 +117,16 @@ async function loadPage() {
 
 // ---- fila ----
 
-function renderItem(item) {
-  const li = el("li", `item status-${item.status}`);
-  const title = el("div", "item-title", item.title || item.url);
-  title.title = item.url;
-
-  const bits = [itemLabel(item), statusLabel(item.status)];
-  if (item.status === "downloading") {
-    bits.push(percent(item.progress));
-    const speed = formatSpeed(item.speed);
-    if (speed) bits.push(speed);
-  }
-  li.append(title, el("div", "item-meta", bits.join(" · ")));
-
-  if (RUNNING.includes(item.status)) {
-    const bar = el("div", "bar");
-    const fill = el("div", "fill");
-    fill.style.width = item.status === "converting" ? "100%" : percent(item.progress);
-    bar.append(fill);
-    li.append(bar);
-  }
-
-  if (item.error_short && item.status !== "done" && item.status !== "cancelled") {
-    li.append(el("div", "item-error", item.error_short));
-    if (item.status === "error" && item.error_detail) {
-      const open = expanded.has(item.id);
-      li.append(linkButton(open ? "ocultar detalhes" : "detalhes", () => {
-        if (open) expanded.delete(item.id);
-        else expanded.add(item.id);
-        lastKey = "";
-        renderQueue(lastItems);
-      }));
-      if (open) li.append(el("pre", "detail", item.error_detail));
-    }
-  }
-
-  const actions = el("div", "item-actions");
-  if (ACTIVE.includes(item.status)) {
-    actions.append(linkButton("Cancelar", () => api.cancel(item.id).then(refreshQueue, showOffline)));
-  }
-  if (item.status === "error" || item.status === "cancelled") {
-    actions.append(linkButton("Tentar de novo", () => api.retry(item.id).then(refreshQueue, showOffline)));
-  }
-  if (actions.childElementCount) li.append(actions);
-  return li;
-}
-
-function renderQueue(items) {
-  const key = JSON.stringify(items) + [...expanded].join(",");
-  if (key === lastKey) return;
-  lastKey = key;
-  lastItems = items;
-  $("queue").replaceChildren(...[...items].reverse().map(renderItem));
-  $("queue-empty").hidden = items.length > 0;
-  $("clear-finished").hidden = !items.some((i) => !ACTIVE.includes(i.status));
-  $("update-box").hidden = !items.some((i) => i.status === "error" && i.error_code === "extractor");
-}
+const queueView = createQueueView({
+  list: $("queue"),
+  empty: $("queue-empty"),
+  clearButton: $("clear-finished"),
+  updateBox: $("update-box"),
+  actions: {
+    cancel: (id) => api.cancel(id).then(refreshQueue, showOffline),
+    retry: (id) => api.retry(id).then(refreshQueue, showOffline),
+  },
+});
 
 function showOffline() {
   setOnline(false);
@@ -204,7 +139,7 @@ async function refreshQueue() {
       await checkStatus();
       loadPage();
     }
-    renderQueue(items);
+    queueView.render(items);
   } catch {
     if (online) setOnline(false);
   }

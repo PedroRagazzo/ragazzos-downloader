@@ -4,5 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test \"extension/tests/*.test.js\""
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.2"
   }
 }
