@@ -58,6 +58,28 @@ def update_when_idle(queue, updater, *, sleep: Callable[[float], None] = time.sl
     return changed, version
 
 
+RESTART_FAILED = ("Não consegui reiniciar depois de atualizar o yt-dlp. "
+                  "A versão nova vale na próxima vez que o programa abrir.")
+
+
+def restart_when_idle(queue, spawn: Callable[[], None], shutdown: Callable[[], None],
+                      on_failure: Callable[[], None], *, sleep: Callable[[float], None] = time.sleep,
+                      poll: float = 2.0) -> bool:
+    """Espera a fila parar, abre a cópia nova e encerra esta. Se não conseguir abrir, segue rodando com a fila solta."""
+    while queue.active_count() > 0:
+        sleep(poll)
+    log.info("reiniciando para carregar a nova versão do yt-dlp")
+    try:
+        spawn()
+    except Exception:
+        log.exception("não consegui reiniciar o programa; seguindo com a versão atual")
+        queue.resume()  # sem isso a fila ficaria pausada para sempre
+        on_failure()
+        return False
+    shutdown()
+    return True
+
+
 def _ytdlp_version() -> str | None:
     try:
         from yt_dlp.version import __version__ as version
@@ -155,12 +177,16 @@ class App:
         threading.Thread(target=self._restart_when_idle, name="restart", daemon=True).start()
 
     def _restart_when_idle(self) -> None:
-        while self.queue.active_count() > 0:
-            time.sleep(2)
-        log.info("reiniciando para carregar a nova versão do yt-dlp")
-        subprocess.Popen([sys.executable, "-m", "videodl", "--wait-for-port"],
-                         cwd=HELPER_DIR, creationflags=_NO_WINDOW)
-        self.shutdown()
+        def spawn() -> None:
+            subprocess.Popen([sys.executable, "-m", "videodl", "--wait-for-port"],
+                             cwd=HELPER_DIR, creationflags=_NO_WINDOW)
+
+        def failed() -> None:
+            self._restarting.clear()  # deixa tentar de novo numa próxima atualização
+            if self.icon is not None:
+                self.icon.notify(RESTART_FAILED, "Ragazzo's Downloader")
+
+        restart_when_idle(self.queue, spawn, self.shutdown, failed)
 
     def _auto_update(self) -> None:
         if not self.updater.due():

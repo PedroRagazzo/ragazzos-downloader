@@ -1,6 +1,6 @@
 import pytest
 
-from videodl.app import AppActions, start_server_with_retry, update_when_idle
+from videodl.app import AppActions, restart_when_idle, start_server_with_retry, update_when_idle
 from videodl.icon import draw_icon
 from videodl.updater import UpdateError
 
@@ -125,3 +125,27 @@ def test_app_actions_update_goes_through_the_queue(tmp_path):
     actions = AppActions(None, RecordingUpdater(queue, result=(False, "v")), tmp_path, lambda: None, queue=queue)
     actions.update_ytdlp()
     assert queue.events == ["pause", "active=0", "pip", "resume"]
+
+
+def test_restart_waits_for_idle_then_spawns_and_shuts_down():
+    queue = FakeQueue([1, 0])
+    steps = []
+    ok = restart_when_idle(queue, spawn=lambda: steps.append("spawn"), shutdown=lambda: steps.append("shutdown"),
+                           on_failure=lambda: steps.append("falhou"), sleep=lambda s: None)
+    assert ok is True
+    assert steps == ["spawn", "shutdown"]
+    assert "resume" not in queue.events
+
+
+def test_failed_restart_keeps_running_and_releases_queue():
+    queue = FakeQueue([0])
+    steps = []
+
+    def spawn():
+        raise OSError("bloqueado pelo antivírus")
+
+    ok = restart_when_idle(queue, spawn=spawn, shutdown=lambda: steps.append("shutdown"),
+                           on_failure=lambda: steps.append("falhou"), sleep=lambda s: None)
+    assert ok is False
+    assert steps == ["falhou"]
+    assert queue.events[-1] == "resume"
