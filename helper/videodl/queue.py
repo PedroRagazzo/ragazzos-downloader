@@ -84,7 +84,7 @@ class DownloadQueue:
         max_workers: int = 2,
         history_limit: int = 50,
         retry_delays: tuple[float, ...] = (5, 15),
-        sleep: Callable[[float], None] = time.sleep,
+        sleep: Callable[[float], None] | None = None,  # só nos testes; o normal é a espera interrompível
         clock: Callable[[], float] = time.time,
     ):
         self._store_path = Path(store_path)
@@ -134,6 +134,7 @@ class DownloadQueue:
                 self._finish(item, CANCELLED)
             elif item.status in RUNNING:
                 self._cancel_requested.add(item_id)
+                self._cond.notify_all()  # acorda a espera entre tentativas
             return item.to_dict()
 
     def retry(self, item_id: str) -> dict:
@@ -311,9 +312,9 @@ class DownloadQueue:
                 if info.retryable and attempts < len(self._retry_delays):
                     with self._cond:
                         item.error_short = info.retrying or info.short
-                    self._sleep(self._retry_delays[attempts])
+                    delay = self._retry_delays[attempts]
                     attempts += 1
-                    if self._is_cancelled(item.id):
+                    if self._wait_before_retry(item.id, delay):
                         self._on_cancelled(item)
                         return
                     continue
@@ -346,6 +347,15 @@ class DownloadQueue:
                 item.speed = update["speed"]
             if changed:
                 self._save()
+
+    def _wait_before_retry(self, item_id: str, delay: float) -> bool:
+        """Espera antes de tentar de novo; cancelar ou sair interrompe na hora. Devolve True se foi interrompida."""
+        if self._sleep is not None:
+            self._sleep(delay)
+        else:
+            with self._cond:
+                self._cond.wait_for(lambda: item_id in self._cancel_requested or self._stopping, timeout=delay)
+        return self._is_cancelled(item_id)
 
     def _is_cancelled(self, item_id: str) -> bool:
         with self._cond:

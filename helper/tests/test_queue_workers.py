@@ -243,3 +243,39 @@ def test_busy_site_retries_then_reports_final_message(tmp_path):
         assert item["error_short"] == "O site está limitando os downloads — tente mais tarde"
     finally:
         q.stop()
+
+
+def network_failure_that_signals(failed):
+    def downloader(item, report, is_cancelled):
+        failed.set()
+        raise RuntimeError("ERROR: Read timed out.")
+    return downloader
+
+
+def test_cancel_during_retry_wait_ends_it_right_away(tmp_path):
+    failed = threading.Event()
+    q = DownloadQueue(tmp_path / "queue.json", network_failure_that_signals(failed), retry_delays=(5,))
+    q.start()
+    try:
+        [item_id], _ = q.add(["https://youtu.be/a"], "video", "best")
+        assert failed.wait(3)
+        time.sleep(0.2)  # já está na espera de 5 s
+        started = time.monotonic()
+        q.cancel(item_id)
+        wait_for(lambda: item_of(q, item_id)["status"] == "cancelled", timeout=1.0)
+        assert time.monotonic() - started < 1.0
+    finally:
+        q.stop()
+
+
+def test_stop_during_retry_wait_returns_right_away(tmp_path):
+    failed = threading.Event()
+    q = DownloadQueue(tmp_path / "queue.json", network_failure_that_signals(failed), retry_delays=(5,))
+    q.start()
+    [item_id], _ = q.add(["https://youtu.be/a"], "video", "best")
+    assert failed.wait(3)
+    time.sleep(0.2)
+    started = time.monotonic()
+    q.stop()
+    assert time.monotonic() - started < 1.0
+    assert item_of(DownloadQueue(tmp_path / "queue.json", lambda *a: ""), item_id)["status"] == "waiting"
