@@ -3,6 +3,13 @@
 Extensão para Brave/Opera/Chrome/Edge + programa local que baixa vídeos (MP4, MKV, MOV) e áudios (MP3, WAV, FLAC)
 do YouTube, TikTok, Instagram e Pinterest. Só conteúdo público; uso pessoal.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/popup-dark.png">
+    <img src="docs/images/popup-light.png" width="380" alt="Popup do Ragazzo's Downloader: escolha de vídeo ou áudio, formato e qualidade, bloco 'Esta página', campo para colar links e a fila com downloads em andamento, convertendo e concluídos">
+  </picture>
+</p>
+
 A extensão é só a interface. Quem baixa é um programa em Python que roda no seu PC
 (em `127.0.0.1`, aceitando apenas a própria extensão) usando o [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 e o [ffmpeg](https://ffmpeg.org/).
