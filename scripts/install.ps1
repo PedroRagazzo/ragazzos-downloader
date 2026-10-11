@@ -10,6 +10,7 @@ if (-not (Test-Path $python)) {
     python -m venv (Join-Path $helper ".venv")
 }
 & $python -m pip install --upgrade pip --disable-pip-version-check
+if ($LASTEXITCODE -ne 0) { Write-Warning "Não consegui atualizar o pip; seguindo com a versão atual." }
 & $python -m pip install -r (Join-Path $helper "requirements.txt") --disable-pip-version-check
 if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar as dependências Python." }
 
@@ -24,8 +25,12 @@ if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
     Write-Host "   ffmpeg já instalado."
 } else {
     winget install --id Gyan.FFmpeg -e
+    $wingetCode = $LASTEXITCODE
     Update-PathFromRegistry
-    if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { throw "ffmpeg instalado, mas não encontrado no PATH." }
+    if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+        if ($wingetCode -ne 0) { throw "Não consegui instalar o ffmpeg (winget saiu com código $wingetCode)." }
+        throw "ffmpeg instalado, mas não encontrado no PATH."
+    }
     Write-Host "   ffmpeg instalado."
 }
 
@@ -37,10 +42,12 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 Write-Host "4/5 ID da extensão e atalhos..." -ForegroundColor Cyan
 if (-not (Test-Path (Join-Path $helper "videodl\extension_id.txt"))) {
     & $python (Join-Path $root "scripts\gen_extension_key.py")
+    if ($LASTEXITCODE -ne 0) { throw "Não consegui gerar a chave da extensão (veja a mensagem acima)." }
 }
 Push-Location $helper
 try {
     & $python -c "from videodl import startup; startup.install_shortcuts()"
+    if ($LASTEXITCODE -ne 0) { throw "Não consegui criar os atalhos do menu Iniciar/Inicializar (veja a mensagem acima)." }
 } finally {
     Pop-Location
 }
