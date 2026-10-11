@@ -163,3 +163,11 @@ def test_old_items_without_format_load_as_default(tmp_path):
     }]}), encoding="utf-8")
     [item] = make_queue(tmp_path).list()
     assert item["ext"] == "mp3"
+
+
+def test_share_variants_of_same_video_are_duplicates(tmp_path):
+    q = make_queue(tmp_path)
+    q.add(["https://youtu.be/abc123?si=um"], "video", "best")
+    added, dup = q.add(["https://www.youtube.com/watch?v=abc123&si=outro"], "video", "best")
+    assert added == [] and dup == 1
+    assert [i["url"] for i in q.list()] == ["https://www.youtube.com/watch?v=abc123"]

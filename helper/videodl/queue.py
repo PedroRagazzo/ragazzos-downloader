@@ -14,6 +14,7 @@ from typing import Callable
 
 from .errors import ErrorInfo, classify_error
 from .formats import final_extension, validate
+from .links import normalize_url
 
 log = logging.getLogger(__name__)
 
@@ -109,6 +110,7 @@ class DownloadQueue:
         duplicates = 0
         with self._cond:
             for url in urls:
+                url = normalize_url(url)  # variações de compartilhamento do mesmo vídeo contam como repetidas
                 if self._has_active_duplicate(url, mode, quality, ext):
                     duplicates += 1
                     continue
