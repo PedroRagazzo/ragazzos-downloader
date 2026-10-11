@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import glob
 import re
 import unicodedata
 from collections.abc import Collection
@@ -43,13 +42,14 @@ def build_base_name(title: str | None, site: str | None) -> str:
     return f"{sanitize_title(title)} [{site_tag(site)}]"
 
 
-def _in_use(folder: Path, base: str, taken: Collection[str]) -> bool:
-    return base in taken or any(folder.glob(glob.escape(base) + ".*"))
+def _in_use(folder: Path, base: str, ext: str, taken: Collection[str]) -> bool:
+    # só conflita com arquivo do mesmo formato: "X.mp3" e "X.mp4" podem conviver
+    return base in taken or (folder / f"{base}.{ext}").exists()
 
 
-def unique_base(folder: Path, base: str, taken: Collection[str] = frozenset()) -> str:
+def unique_base(folder: Path, base: str, ext: str, taken: Collection[str] = frozenset()) -> str:
     candidate, n = base, 2
-    while _in_use(folder, candidate, taken):
+    while _in_use(folder, candidate, ext, taken):
         candidate = f"{base} ({n})"
         n += 1
     return candidate

@@ -63,20 +63,21 @@ def test_build_base_name():
 
 
 def test_unique_base_free_name(tmp_path):
-    assert unique_base(tmp_path, "X [youtube]") == "X [youtube]"
+    assert unique_base(tmp_path, "X [youtube]", "mp4") == "X [youtube]"
 
 
-def test_unique_base_counts_up(tmp_path):
+def test_unique_base_counts_up_within_same_format(tmp_path):
     (tmp_path / "X [youtube].mp4").write_bytes(b"")
-    (tmp_path / "X [youtube] (2).mp3").write_bytes(b"")
-    assert unique_base(tmp_path, "X [youtube]") == "X [youtube] (3)"
+    (tmp_path / "X [youtube] (2).mp4").write_bytes(b"")
+    assert unique_base(tmp_path, "X [youtube]", "mp4") == "X [youtube] (3)"
 
 
-def test_unique_base_any_extension_counts(tmp_path):
-    # protege arquivos do usuário: a limpeza de parciais apaga "base.*"
+def test_unique_base_ignores_other_formats(tmp_path):
+    # mesmo vídeo em MP3 e MP4 pode ter o mesmo nome
     (tmp_path / "X [youtube].mp3").write_bytes(b"")
-    assert unique_base(tmp_path, "X [youtube]") == "X [youtube] (2)"
+    (tmp_path / "X [youtube].f137.mp4.part").write_bytes(b"")
+    assert unique_base(tmp_path, "X [youtube]", "mp4") == "X [youtube]"
 
 
 def test_unique_base_respects_taken(tmp_path):
-    assert unique_base(tmp_path, "X [youtube]", taken={"X [youtube]"}) == "X [youtube] (2)"
+    assert unique_base(tmp_path, "X [youtube]", "mp4", taken={"X [youtube]"}) == "X [youtube] (2)"

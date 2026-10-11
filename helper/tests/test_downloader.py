@@ -191,3 +191,42 @@ def test_item_without_format_still_downloads_mp4(tmp_path):
     factory, _ = make_factory(INFO)
     path = YtDlpDownloader(tmp_path, ydl_factory=factory)(make_item(ext=None), lambda u: None, lambda: False)
     assert Path(path).suffix == ".mp4"
+
+
+def test_same_video_in_other_format_keeps_name(tmp_path):
+    (tmp_path / "Meu vídeo [youtube].mp4").write_bytes(b"video")
+    factory, _ = make_factory(INFO)
+    path = YtDlpDownloader(tmp_path, ydl_factory=factory)(make_item("audio", "192"), lambda u: None, lambda: False)
+    assert Path(path).name == "Meu vídeo [youtube].mp3"
+    assert (tmp_path / "Meu vídeo [youtube].mp4").read_bytes() == b"video"
+
+
+def cancel_after_progress():
+    state = {"cancel": False}
+
+    def report(update):
+        if "progress" in update:
+            state["cancel"] = True
+
+    return report, lambda: state["cancel"]
+
+
+def test_cancel_keeps_other_format_with_same_name(tmp_path):
+    (tmp_path / "Meu vídeo [youtube].mp3").write_bytes(b"audio")
+    factory, _ = make_factory(INFO)
+    report, is_cancelled = cancel_after_progress()
+    with pytest.raises(Cancelled):
+        YtDlpDownloader(tmp_path, ydl_factory=factory)(make_item(), report, is_cancelled)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["Meu vídeo [youtube].mp3"]
+
+
+def test_cancel_of_resumed_download_removes_its_old_partial(tmp_path):
+    (tmp_path / "Meu vídeo [youtube].mp3").write_bytes(b"audio")
+    (tmp_path / "Meu vídeo [youtube].f2.webm.part").write_bytes(b"sobra da vez anterior")
+    factory, _ = make_factory(INFO)
+    item = make_item()
+    item.base = "Meu vídeo [youtube]"
+    report, is_cancelled = cancel_after_progress()
+    with pytest.raises(Cancelled):
+        YtDlpDownloader(tmp_path, ydl_factory=factory)(item, report, is_cancelled)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["Meu vídeo [youtube].mp3"]

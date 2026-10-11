@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import glob
 import logging
+import re
 import threading
 from pathlib import Path
 from typing import Callable
@@ -49,6 +50,14 @@ def _single_entry(info: dict) -> dict:
     return info
 
 
+_PARTIAL = re.compile(r"\.(f[\w-]+\.\w+|\w+\.part|part|ytdl|temp\.\w+)(\.part.*|\.ytdl)?$|\.part-Frag\d+")
+
+
+def _is_partial(name: str, base: str) -> bool:
+    """Arquivo temporário do yt-dlp (fragmento, .part, .ytdl, .temp), não um arquivo pronto."""
+    return bool(_PARTIAL.search(name[len(base):]))
+
+
 def _site_of(info: dict) -> str:
     return info.get("extractor_key") or info.get("extractor") or "web"
 
@@ -89,10 +98,14 @@ class YtDlpDownloader:
         report({"title": info.get("title") or item.url})
 
         ext = final_extension(item.mode, item.ext)
-        if item.base and not (self._dir / f"{item.base}.{ext}").exists():
-            base = self._reserve_saved(item.base)  # retomada: mesmo nome, o yt-dlp continua o .part
+        resuming = bool(item.base) and not (self._dir / f"{item.base}.{ext}").exists()
+        if resuming:
+            base = self._reserve_saved(item.base, ext)  # retomada: mesmo nome, o yt-dlp continua o .part
         else:
-            base = self._reserve(build_base_name(info.get("title"), _site_of(info)))
+            base = self._reserve(build_base_name(info.get("title"), _site_of(info)), ext)
+        # o que já existia com esse nome não é deste download e nunca é apagado na limpeza;
+        # na retomada, os parciais da vez anterior são deste item e podem ir embora
+        existing = {p for p in self._files_named(base) if not (resuming and _is_partial(p.name, base))}
         report({"base": base})
         target = self._dir / f"{base}.{ext}"
 
@@ -126,23 +139,23 @@ class YtDlpDownloader:
                 raise RuntimeError(f"arquivo final não encontrado: {target.name}")
             return str(target)
         except BaseException:
-            self._cleanup(base)
+            self._cleanup(base, existing)
             if is_cancelled():
                 raise Cancelled() from None
             raise
         finally:
             self._release(base)
 
-    def _reserve(self, wanted: str) -> str:
+    def _reserve(self, wanted: str, ext: str) -> str:
         with self._lock:
-            base = unique_base(self._dir, wanted, taken=self._reserved)
+            base = unique_base(self._dir, wanted, ext, taken=self._reserved)
             self._reserved.add(base)
             return base
 
-    def _reserve_saved(self, saved: str) -> str:
+    def _reserve_saved(self, saved: str, ext: str) -> str:
         with self._lock:
             if saved in self._reserved:  # outro download ativo já usa esse nome
-                saved = unique_base(self._dir, saved, taken=self._reserved)
+                saved = unique_base(self._dir, saved, ext, taken=self._reserved)
             self._reserved.add(saved)
             return saved
 
@@ -150,8 +163,12 @@ class YtDlpDownloader:
         with self._lock:
             self._reserved.discard(base)
 
-    def _cleanup(self, base: str) -> None:
-        for path in self._dir.glob(glob.escape(base) + ".*"):
+    def _files_named(self, base: str) -> set[Path]:
+        return set(self._dir.glob(glob.escape(base) + ".*"))
+
+    def _cleanup(self, base: str, existing: set[Path]) -> None:
+        # apaga só o que este download criou (ex.: "X.mp3" já existente fica ao cancelar o "X.mp4")
+        for path in self._files_named(base) - existing:
             try:
                 path.unlink()
             except OSError:
