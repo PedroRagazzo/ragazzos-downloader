@@ -1,6 +1,6 @@
 import pytest
 
-from videodl.app import AppActions, restart_when_idle, start_server_with_retry, update_when_idle
+from videodl.app import AppActions, auto_update_loop, auto_update_once, restart_when_idle, start_server_with_retry, update_when_idle
 from videodl.icon import draw_icon
 from videodl.updater import UpdateError
 
@@ -149,3 +149,55 @@ def test_failed_restart_keeps_running_and_releases_queue():
     assert ok is False
     assert steps == ["falhou"]
     assert queue.events[-1] == "resume"
+
+
+class DueUpdater:
+    def __init__(self, due):
+        self._due = due
+
+    def due(self):
+        return self._due
+
+
+def test_periodic_check_skips_when_not_due():
+    updates = []
+    assert auto_update_once(DueUpdater(False), FakeQueue([0]), lambda: updates.append(1)) is False
+    assert updates == []
+
+
+def test_periodic_check_waits_for_idle_queue():
+    updates = []
+    assert auto_update_once(DueUpdater(True), FakeQueue([1]), lambda: updates.append(1)) is False
+    assert updates == []
+
+
+def test_periodic_check_updates_when_due_and_idle():
+    updates = []
+    assert auto_update_once(DueUpdater(True), FakeQueue([0]), lambda: updates.append(1)) is True
+    assert updates == [1]
+
+
+def test_periodic_check_survives_update_failure():
+    def failing():
+        raise UpdateError("sem internet")
+
+    assert auto_update_once(DueUpdater(True), FakeQueue([0]), failing) is True  # tentou; tenta de novo na próxima hora
+
+
+class FakeStop:
+    def __init__(self, ticks):
+        self.ticks = ticks
+        self.timeouts = []
+
+    def wait(self, timeout):
+        self.timeouts.append(timeout)
+        self.ticks -= 1
+        return self.ticks < 0  # True = pediram para parar
+
+
+def test_loop_checks_every_hour_until_stopped():
+    checks = []
+    stop = FakeStop(ticks=3)
+    auto_update_loop(lambda: checks.append(1), stop)
+    assert checks == [1, 1, 1]
+    assert stop.timeouts == [3600, 3600, 3600, 3600]

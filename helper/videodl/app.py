@@ -58,6 +58,28 @@ def update_when_idle(queue, updater, *, sleep: Callable[[float], None] = time.sl
     return changed, version
 
 
+UPDATE_CHECK_INTERVAL = 3600  # confere de hora em hora se já passaram 24 h (funciona mesmo após hibernar)
+
+
+def auto_update_once(updater, queue, update: Callable[[], object]) -> bool:
+    """Atualiza se já deu o prazo e não há download rodando (para não pausar a fila no meio do uso).
+
+    Devolve True se tentou atualizar. Falhas só vão para o log: tenta de novo na próxima checagem.
+    """
+    if not updater.due() or queue.active_count() > 0:
+        return False
+    try:
+        update()
+    except Exception:
+        log.exception("atualização periódica do yt-dlp falhou")
+    return True
+
+
+def auto_update_loop(check: Callable[[], object], stop, interval: float = UPDATE_CHECK_INTERVAL) -> None:
+    while not stop.wait(interval):
+        check()
+
+
 RESTART_FAILED = ("Não consegui reiniciar depois de atualizar o yt-dlp. "
                   "A versão nova vale na próxima vez que o programa abrir.")
 
@@ -127,6 +149,7 @@ class App:
     def __init__(self, wait_for_port: bool):
         self._wait_for_port = wait_for_port
         self._restarting = threading.Event()
+        self._stopping = threading.Event()
         self.icon = None
 
     def run(self) -> int:
@@ -153,6 +176,8 @@ class App:
         self.queue.start()
         threading.Thread(target=self.server.serve_forever, name="api", daemon=True).start()
         threading.Thread(target=self._auto_update, name="auto-update", daemon=True).start()
+        threading.Thread(target=auto_update_loop, args=(self._periodic_update, self._stopping),
+                         name="auto-update-loop", daemon=True).start()
         log.info("Ragazzo's Downloader %s ouvindo em 127.0.0.1:%d", __version__, PORT)
 
         from .tray import build_icon  # import tardio: pystray só é necessário aqui
@@ -163,6 +188,7 @@ class App:
 
     def shutdown(self) -> None:
         log.info("encerrando")
+        self._stopping.set()
         self.server.shutdown()
         self.server.server_close()
         self.queue.stop()
@@ -197,6 +223,15 @@ class App:
             log.exception("atualização automática do yt-dlp falhou")
             return
         log.info("yt-dlp verificado: %s (mudou: %s)", result["version"], result["restarting"])
+
+    def _periodic_update(self) -> None:
+        if self._restarting.is_set():
+            return
+        auto_update_once(self.updater, self.queue, self._log_update)
+
+    def _log_update(self) -> None:
+        result = self.actions.update_ytdlp()
+        log.info("yt-dlp verificado (periódico): %s (mudou: %s)", result["version"], result["restarting"])
 
     def _tray_update(self) -> None:
         def work() -> None:
