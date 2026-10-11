@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import glob
 import logging
+import os
 import re
 import threading
 from pathlib import Path
@@ -86,28 +87,16 @@ class YtDlpDownloader:
 
     def get_info(self, url: str) -> dict:
         with self._factory(self._base_opts()) as ydl:
-            info = _single_entry(ydl.extract_info(url, download=False))
+            # consulta leve: título e miniatura sem resolver os formatos do vídeo
+            info = ydl.extract_info(url, download=False, process=False)
+            if info.get("_type", "video") != "video" or not info.get("title"):
+                # link curto/redirecionamento ou lista: só a consulta completa traz o vídeo de fato
+                info = _single_entry(ydl.extract_info(url, download=False))
         return {"title": info.get("title") or url, "thumbnail": info.get("thumbnail"), "site": site_tag(_site_of(info))}
 
     def __call__(self, item: Item, report: Callable[[dict], None], is_cancelled: Callable[[], bool]) -> str:
         self._dir.mkdir(parents=True, exist_ok=True)
-        with self._factory(self._base_opts()) as ydl:
-            info = _single_entry(ydl.extract_info(item.url, download=False))
-        if is_cancelled():
-            raise Cancelled()
-        report({"title": info.get("title") or item.url})
-
         ext = final_extension(item.mode, item.ext)
-        resuming = bool(item.base) and not (self._dir / f"{item.base}.{ext}").exists()
-        if resuming:
-            base = self._reserve_saved(item.base, ext)  # retomada: mesmo nome, o yt-dlp continua o .part
-        else:
-            base = self._reserve(build_base_name(info.get("title"), _site_of(info)), ext)
-        # o que já existia com esse nome não é deste download e nunca é apagado na limpeza;
-        # na retomada, os parciais da vez anterior são deste item e podem ir embora
-        existing = {p for p in self._files_named(base) if not (resuming and _is_partial(p.name, base))}
-        report({"base": base})
-        target = self._dir / f"{base}.{ext}"
 
         def progress_hook(d: dict) -> None:
             if is_cancelled():
@@ -127,24 +116,41 @@ class YtDlpDownloader:
         opts = {
             **self._base_opts(),
             **build_format_opts(item.mode, item.quality, item.ext),
-            "outtmpl": {"default": str(self._dir / base).replace("%", "%%") + ".%(ext)s"},
+            # o nome só se conhece depois de extrair: vai no campo vdl_base do próprio info
+            "outtmpl": {"default": os.path.join(str(self._dir).replace("%", "%%"), "%(vdl_base)s.%(ext)s")},
             "progress_hooks": [progress_hook],
             "postprocessor_hooks": [postprocessor_hook],
         }
-        try:
-            # extrai de novo nesta instância: links resolvidos em outra instância dão 403 no YouTube
-            with self._factory(opts) as ydl:
-                ydl.extract_info(item.url, download=True)
-            if not target.exists():
-                raise RuntimeError(f"arquivo final não encontrado: {target.name}")
-            return str(target)
-        except BaseException:
-            self._cleanup(base, existing)
+        # Uma só instância e uma só consulta ao site: extrair aqui e baixar em outra instância dá 403 no YouTube.
+        with self._factory(opts) as ydl:
+            info = _single_entry(ydl.extract_info(item.url, download=False))
             if is_cancelled():
-                raise Cancelled() from None
-            raise
-        finally:
-            self._release(base)
+                raise Cancelled()
+            report({"title": info.get("title") or item.url})
+
+            resuming = bool(item.base) and not (self._dir / f"{item.base}.{ext}").exists()
+            if resuming:
+                base = self._reserve_saved(item.base, ext)  # retomada: mesmo nome, o yt-dlp continua o .part
+            else:
+                base = self._reserve(build_base_name(info.get("title"), _site_of(info)), ext)
+            # o que já existia com esse nome não é deste download e nunca é apagado na limpeza;
+            # na retomada, os parciais da vez anterior são deste item e podem ir embora
+            existing = {p for p in self._files_named(base) if not (resuming and _is_partial(p.name, base))}
+            report({"base": base})
+            target = self._dir / f"{base}.{ext}"
+            try:
+                info["vdl_base"] = base
+                ydl.process_ie_result(info, download=True)
+                if not target.exists():
+                    raise RuntimeError(f"arquivo final não encontrado: {target.name}")
+                return str(target)
+            except BaseException:
+                self._cleanup(base, existing)
+                if is_cancelled():
+                    raise Cancelled() from None
+                raise
+            finally:
+                self._release(base)
 
     def _reserve(self, wanted: str, ext: str) -> str:
         with self._lock:

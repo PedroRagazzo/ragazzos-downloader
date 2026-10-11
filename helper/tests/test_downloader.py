@@ -17,12 +17,14 @@ PLAYLIST = {
 }
 
 
-def make_factory(info, *, fail_on_download=None):
+def make_factory(info, *, fail_on_download=None, light_info=None):
     calls = []
+    extracts = []
 
     class FakeYDL:
         def __init__(self, params):
             self.params = params
+            self._mine = set()  # ids dos infos extraídos por ESTA instância
             calls.append(params)
 
         def __enter__(self):
@@ -31,21 +33,31 @@ def make_factory(info, *, fail_on_download=None):
         def __exit__(self, *exc):
             return False
 
-        def extract_info(self, url, download=False):
-            if isinstance(info, Exception):
-                raise info
+        def extract_info(self, url, download=False, process=True):
+            extracts.append({"url": url, "download": download, "process": process})
+            source = light_info if (not process and light_info is not None) else info
+            if isinstance(source, Exception):
+                raise source
             if download:
-                self._fake_download()
-            return copy.deepcopy(info)
+                raise AssertionError("o downloader deve baixar com process_ie_result na mesma instância")
+            result = copy.deepcopy(source)
+            self._mine.add(id(result))
+            for entry in result.get("entries") or []:
+                self._mine.add(id(entry))
+            return result
 
         def process_ie_result(self, entry, download=True):
-            # como no yt-dlp real: links resolvidos em outra instância dão 403 ao baixar
-            raise RuntimeError("ERROR: unable to download video data: HTTP Error 403: Forbidden")
+            # como no yt-dlp real: info resolvido em OUTRA instância dá 403 ao baixar
+            if id(entry) not in self._mine:
+                raise RuntimeError("ERROR: unable to download video data: HTTP Error 403: Forbidden")
+            self._fake_download(entry)
+            return entry
 
-        def _fake_download(self):
+        def _fake_download(self, entry):
             template = self.params["outtmpl"]["default"]
-            assert template.endswith(".%(ext)s")
-            base = template[: -len(".%(ext)s")].replace("%%", "%")
+            suffix = "%(vdl_base)s.%(ext)s"
+            assert template.endswith(suffix)
+            base = template[: -len(suffix)].replace("%%", "%") + entry["vdl_base"]
             part = Path(base + ".f1.mp4.part")
             part.write_bytes(b"partial")
             if fail_on_download:
@@ -60,6 +72,7 @@ def make_factory(info, *, fail_on_download=None):
             ext = extract[0]["preferredcodec"] if extract else self.params["merge_output_format"]
             Path(base + "." + ext).write_bytes(b"media")
 
+    FakeYDL.extracts = extracts
     return FakeYDL, calls
 
 
@@ -76,14 +89,14 @@ def test_downloads_video_with_readable_name(tmp_path):
     assert {"title": "Meu vídeo"} in reports
     assert {"status": "downloading", "progress": 0.5, "speed": 2048.0} in reports
     assert {"status": "converting"} in reports
-    assert calls[1]["format_sort"][0] == "res:720"
+    assert calls[0]["format_sort"][0] == "res:720"
 
 
 def test_downloads_audio_as_mp3(tmp_path):
     factory, calls = make_factory(INFO)
     path = YtDlpDownloader(tmp_path, ydl_factory=factory)(make_item("audio", "192"), lambda u: None, lambda: False)
     assert Path(path) == tmp_path / "Meu vídeo [youtube].mp3"
-    assert calls[1]["postprocessors"][0]["preferredquality"] == "192"
+    assert calls[0]["postprocessors"][0]["preferredquality"] == "192"
 
 
 def test_name_conflict_gets_number(tmp_path):
@@ -230,3 +243,26 @@ def test_cancel_of_resumed_download_removes_its_old_partial(tmp_path):
     with pytest.raises(Cancelled):
         YtDlpDownloader(tmp_path, ydl_factory=factory)(item, report, is_cancelled)
     assert sorted(p.name for p in tmp_path.iterdir()) == ["Meu vídeo [youtube].mp3"]
+
+
+def test_download_queries_the_site_only_once(tmp_path):
+    factory, calls = make_factory(INFO)
+    YtDlpDownloader(tmp_path, ydl_factory=factory)(make_item(), lambda u: None, lambda: False)
+    assert len(factory.extracts) == 1
+    assert len(calls) == 1
+
+
+def test_get_info_uses_light_extraction(tmp_path):
+    factory, _ = make_factory(INFO)
+    info = YtDlpDownloader(tmp_path, ydl_factory=factory).get_info("https://youtu.be/a")
+    assert info["title"] == "Meu vídeo"
+    assert [e["process"] for e in factory.extracts] == [False]
+
+
+def test_get_info_resolves_redirect_links(tmp_path):
+    # link curto: a consulta leve só devolve "vá para outro link", sem título
+    redirect = {"_type": "url", "url": "https://www.youtube.com/watch?v=a", "ie_key": "Youtube"}
+    factory, _ = make_factory(INFO, light_info=redirect)
+    info = YtDlpDownloader(tmp_path, ydl_factory=factory).get_info("https://youtu.be/a")
+    assert info["title"] == "Meu vídeo"
+    assert [e["process"] for e in factory.extracts] == [False, True]
