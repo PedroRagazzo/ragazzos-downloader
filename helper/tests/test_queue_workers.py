@@ -219,3 +219,27 @@ def test_clear_finished_keeps_running_item(tmp_path):
         assert {i["id"] for i in q.list()} == {running, waiting}
     finally:
         q.stop()
+
+
+def test_busy_site_retries_then_reports_final_message(tmp_path):
+    seen_while_retrying = []
+    sleeps = []
+    q = None
+
+    def downloader(item, report, is_cancelled):
+        if q is not None and len(sleeps) == 1:
+            seen_while_retrying.append(item_of(q, item.id)["error_short"])
+        raise RuntimeError("ERROR: Unable to download webpage: HTTP Error 429: Too Many Requests")
+
+    q = DownloadQueue(tmp_path / "queue.json", downloader, sleep=sleeps.append)
+    q.start()
+    try:
+        [item_id], _ = q.add(["https://youtu.be/a"], "video", "best")
+        wait_for(lambda: item_of(q, item_id)["status"] == "error")
+        item = item_of(q, item_id)
+        assert sleeps == [5, 15]
+        assert seen_while_retrying == ["O site está limitando ou instável, tentando de novo…"]
+        assert item["error_code"] == "busy"
+        assert item["error_short"] == "O site está limitando os downloads — tente mais tarde"
+    finally:
+        q.stop()

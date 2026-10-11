@@ -27,6 +27,10 @@ from videodl.errors import classify_error
          "this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template.", "private"),
         ("ERROR: [TikTok] 6748451240264420610: Your IP address is blocked from accessing this post", "unavailable"),
         ("ERROR: [generic] x: something odd; please report this issue on https://github.com/yt-dlp/yt-dlp/issues", "extractor"),
+        ("ERROR: [youtube] abc: Unable to download webpage: HTTP Error 429: Too Many Requests", "busy"),
+        ("ERROR: unable to download video data: HTTP Error 503: Service Unavailable", "busy"),
+        ("ERROR: [TikTok] 1: Unable to download webpage: HTTP Error 502: Bad Gateway", "busy"),
+        ("ERROR: HTTP Error 500: Internal Server Error", "busy"),
         ("algo totalmente diferente", "unknown"),
     ],
 )
@@ -44,7 +48,19 @@ def test_short_messages_in_portuguese():
     assert classify_error("???").short == "Erro inesperado — veja os detalhes"
 
 
-def test_only_network_is_retryable():
+def test_retryable_flags():
     assert classify_error("ERROR: Read timed out.").retryable is True
     assert classify_error("ERROR: Unsupported URL: x").retryable is False
     assert classify_error("???").retryable is False
+
+
+def test_busy_site_is_retried_with_its_own_messages():
+    info = classify_error("ERROR: HTTP Error 429: Too Many Requests")
+    assert info.retryable is True
+    assert info.retrying == "O site está limitando ou instável, tentando de novo…"
+    assert info.short == "O site está limitando os downloads — tente mais tarde"
+
+
+def test_instagram_login_or_rate_limit_message_stays_private():
+    info = classify_error("ERROR: [Instagram] xyz: Requested content is not available, rate-limit reached or login required")
+    assert info.code == "private" and info.retryable is False

@@ -310,7 +310,7 @@ class DownloadQueue:
                 info = classify_error(str(exc))
                 if info.retryable and attempts < len(self._retry_delays):
                     with self._cond:
-                        item.error_short = info.short
+                        item.error_short = info.retrying or info.short
                     self._sleep(self._retry_delays[attempts])
                     attempts += 1
                     if self._is_cancelled(item.id):
