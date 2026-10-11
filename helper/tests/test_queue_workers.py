@@ -279,3 +279,17 @@ def test_stop_during_retry_wait_returns_right_away(tmp_path):
     q.stop()
     assert time.monotonic() - started < 1.0
     assert item_of(DownloadQueue(tmp_path / "queue.json", lambda *a: ""), item_id)["status"] == "waiting"
+
+
+def test_resume_after_pause_picks_waiting_items(tmp_path):
+    q = DownloadQueue(tmp_path / "queue.json", lambda item, report, is_cancelled: "x.mp4")
+    q.pause()
+    q.start()
+    try:
+        [item_id], _ = q.add(["https://youtu.be/a"], "video", "best")
+        time.sleep(0.2)
+        assert item_of(q, item_id)["status"] == "waiting"
+        q.resume()
+        wait_for(lambda: item_of(q, item_id)["status"] == "done")
+    finally:
+        q.stop()

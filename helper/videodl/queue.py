@@ -255,6 +255,11 @@ class DownloadQueue:
         with self._cond:
             self._paused = True
 
+    def resume(self) -> None:
+        with self._cond:
+            self._paused = False
+            self._cond.notify_all()
+
     def _next_waiting(self) -> Item | None:
         if self._paused or self._stopping:
             return None

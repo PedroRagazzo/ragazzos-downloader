@@ -39,6 +39,25 @@ def start_server_with_retry(factory: Callable[[], T], attempts: int, delay: floa
     return None
 
 
+def update_when_idle(queue, updater, *, sleep: Callable[[float], None] = time.sleep,
+                     poll: float = 0.5) -> tuple[bool, str]:
+    """Atualiza o yt-dlp sem downloads rodando: o pip trocar arquivos no meio de um download o quebraria.
+
+    Se a versão mudou, a fila fica pausada (o programa vai reiniciar); senão, volta ao normal.
+    """
+    queue.pause()
+    try:
+        while queue.active_count() > 0:
+            sleep(poll)
+        changed, version = updater.update()
+    except BaseException:
+        queue.resume()
+        raise
+    if not changed:
+        queue.resume()
+    return changed, version
+
+
 def _ytdlp_version() -> str | None:
     try:
         from yt_dlp.version import __version__ as version
@@ -48,11 +67,13 @@ def _ytdlp_version() -> str | None:
 
 
 class AppActions:
-    def __init__(self, downloader, updater, download_dir: Path, request_restart: Callable[[], None]):
+    def __init__(self, downloader, updater, download_dir: Path, request_restart: Callable[[], None], queue=None):
         self._downloader = downloader
         self._updater = updater
         self._dir = Path(download_dir)
         self._request_restart = request_restart
+        self._queue = queue
+        self._update_lock = threading.Lock()  # automática, popup e bandeja nunca rodam o pip ao mesmo tempo
 
     def status(self) -> dict:
         return {
@@ -70,7 +91,11 @@ class AppActions:
         os.startfile(self._dir)  # type: ignore[attr-defined]  # só existe no Windows
 
     def update_ytdlp(self) -> dict:
-        changed, version = self._updater.update()
+        with self._update_lock:
+            if self._queue is not None:
+                changed, version = update_when_idle(self._queue, self._updater)
+            else:
+                changed, version = self._updater.update()
         if changed:
             self._request_restart()
         return {"ok": True, "version": version, "restarting": changed}
@@ -92,7 +117,7 @@ class App:
         downloader = YtDlpDownloader(download_dir, js_runtime=node)
         self.queue = DownloadQueue(app_dir / "queue.json", downloader)
         self.updater = Updater(app_dir / "update.json")
-        self.actions = AppActions(downloader, self.updater, download_dir, self.request_restart)
+        self.actions = AppActions(downloader, self.updater, download_dir, self.request_restart, queue=self.queue)
         origin = paths.extension_origin()
 
         self.server = start_server_with_retry(
@@ -141,13 +166,11 @@ class App:
         if not self.updater.due():
             return
         try:
-            changed, version = self.updater.update()
+            result = self.actions.update_ytdlp()  # espera a fila ficar parada e pede reinício se mudou
         except Exception:
             log.exception("atualização automática do yt-dlp falhou")
             return
-        log.info("yt-dlp verificado: %s (mudou: %s)", version, changed)
-        if changed:
-            self.request_restart()
+        log.info("yt-dlp verificado: %s (mudou: %s)", result["version"], result["restarting"])
 
     def _tray_update(self) -> None:
         def work() -> None:
